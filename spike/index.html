@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Токены и словарь</title>
+<!--
+  SPIKE, одноразовая страница. Проверяет, работает ли интерактив внутри iframe в шаге Stepik.
+  Логика повторяет модуль 5, урок 6: word_vocab и tokenize_words_with_unk / detokenize_words.
+  В курс не идёт. После проверки удалить.
+-->
+<style>
+:root {
+  --bg: #f5f4ef;
+  --surface: #ffffff;
+  --ink: #1c1c1a;
+  --muted: #6a6963;
+  --line: #dcdad1;
+  --accent: #2a62c9;
+  --accent-soft: #e2eafa;
+  --space: #85847d;
+  --space-soft: #ecebe6;
+  --warn: #a8481a;
+  --warn-soft: #f9e6da;
+  --ok: #2a7346;
+  --ok-soft: #e0f1e6;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17171a;
+    --surface: #212126;
+    --ink: #ecebe6;
+    --muted: #9b9a93;
+    --line: #36363d;
+    --accent: #7ea6f2;
+    --accent-soft: #263453;
+    --space: #8f8e88;
+    --space-soft: #2c2c32;
+    --warn: #f0a072;
+    --warn-soft: #4a2c1e;
+    --ok: #79c995;
+    --ok-soft: #1f3a29;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17171a;
+  --surface: #212126;
+  --ink: #ecebe6;
+  --muted: #9b9a93;
+  --line: #36363d;
+  --accent: #7ea6f2;
+  --accent-soft: #263453;
+  --space: #8f8e88;
+  --space-soft: #2c2c32;
+  --warn: #f0a072;
+  --warn-soft: #4a2c1e;
+  --ok: #79c995;
+  --ok-soft: #1f3a29;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: 16px;
+}
+.mono, code, input { font-family: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace; }
+
+.eyebrow { margin: 0; color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+h1 { margin: 2px 0 12px; font-size: 20px; font-weight: 600; }
+h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.input-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.input-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.input-row input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+button {
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+
+.vocab { display: flex; flex-wrap: wrap; gap: 6px; }
+.entry {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-size: 14px;
+  transition: background .2s, border-color .2s, transform .2s;
+}
+.entry .id { color: var(--muted); font-size: 13px; }
+.entry--added { border-style: dashed; }
+.entry--hit { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-2px); }
+.entry--hit.entry--unk { background: var(--warn-soft); border-color: var(--warn); }
+
+.tokens { display: flex; flex-wrap: wrap; gap: 6px; min-height: 58px; }
+.tok {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 46px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  animation: pop .25s ease-out;
+}
+.tok .w { font-size: 14px; }
+.tok .id { font-size: 13px; color: var(--muted); }
+.tok--space { border-color: var(--space); background: var(--space-soft); }
+.tok--space .w { color: var(--space); font-size: 12px; }
+.tok--unk { border-color: var(--warn); background: var(--warn-soft); }
+.tok--unk .w { text-decoration: line-through; text-decoration-color: var(--warn); }
+.tok--active { box-shadow: 0 0 0 2px var(--ink); }
+.tok button { margin-top: 3px; padding: 1px 6px; font-size: 11px; }
+@keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.status { min-height: 21px; margin: 6px 0 0; font-size: 14px; }
+.out { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.out + .out { margin-top: 4px; }
+.out b { color: var(--accent); font-weight: 500; }
+
+.diag { font-size: 12px; color: var(--muted); }
+.diag ul { margin: 4px 0 0; padding-left: 18px; }
+.diag--fail { color: var(--warn); font-size: 14px; font-weight: 600; }
+.diag-actions { margin-top: 6px; }
+.diag-actions button { font-size: 12px; padding: 3px 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tok, .entry { animation: none; transition: none; }
+}
+</style>
+</head>
+<body>
+
+<p class="eyebrow">Модуль 5 · тест встраивания</p>
+<h1>Как словарь превращает слова в ID</h1>
+
+<noscript>
+  <div class="card diag diag--fail">❌ Скрипты не работают: iframe запущен без JavaScript.</div>
+</noscript>
+
+<div class="card">
+  <h2><label for="text">Текст</label></h2>
+  <div class="input-row">
+    <input id="text" type="text" value="Кот очень любит свежую сметану" autocomplete="off" spellcheck="false">
+    <button type="button" class="primary" id="play">▶ по шагам</button>
+    <button type="button" id="reset">сброс</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Словарь <code>word_vocab</code></h2>
+  <div class="vocab" id="vocab"></div>
+</div>
+
+<div class="card">
+  <h2>Токены</h2>
+  <div class="tokens" id="tokens" aria-live="polite"></div>
+  <p class="status" id="status"></p>
+</div>
+
+<div class="card">
+  <p class="out mono">ids = <b id="ids"></b></p>
+  <p class="out mono">detokenize → <b id="detok"></b></p>
+</div>
+
+<div class="card diag" id="diag">
+  <strong>Диагностика встраивания</strong>
+  <ul id="diag-list"><li>❌ JavaScript не запустился</li></ul>
+  <div class="diag-actions"><button type="button" id="copy-diag">скопировать</button> <span id="copy-result"></span></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const SPACE = "Пробел";
+  const UNK = "[UNK]";
+  const START_TEXT = "Кот очень любит свежую сметану";
+  const START_VOCAB = { "Кот": 2, "любит": 3, "сметану": 4, [SPACE]: 99, [UNK]: 100 };
+  const STEP_MS = 650;
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let vocab = { ...START_VOCAB };
+  let added = new Set();
+  let timer = null;
+
+  const $ = (id) => document.getElementById(id);
+  const input = $("text");
+  const vocabEl = $("vocab");
+  const tokensEl = $("tokens");
+  const statusEl = $("status");
+
+  const has = (word) => Object.prototype.hasOwnProperty.call(vocab, word);
+
+  // tokenize_words_with_unk из модуля 5: слова через split(), между ними токен «Пробел».
+  function tokenize(text) {
+    const words = text.split(/\s+/).filter(Boolean);
+    const tokens = [];
+    words.forEach((word, i) => {
+      tokens.push({ word, id: has(word) ? vocab[word] : vocab[UNK], known: has(word) });
+      if (i < words.length - 1) {
+        tokens.push({ word: SPACE, id: vocab[SPACE], known: true, space: true });
+      }
+    });
+    return tokens;
+  }
+
+  // detokenize_words из модуля 5: id -> слово, «Пробел» выкидываем, склеиваем через пробел.
+  function detokenize(ids) {
+    const idToWord = {};
+    Object.keys(vocab).forEach((word) => { idToWord[vocab[word]] = word; });
+    return ids.map((id) => idToWord[id]).filter((word) => word !== SPACE).join(" ");
+  }
+
+  function nextId() {
+    const used = Object.values(vocab).filter((id) => id < vocab[SPACE]);
+    return Math.max(...used) + 1;
+  }
+
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function renderVocab(hitWord) {
+    vocabEl.replaceChildren(...Object.keys(vocab).map((word) => {
+      const entry = el("span", "entry");
+      if (added.has(word)) entry.classList.add("entry--added");
+      if (word === UNK) entry.classList.add("entry--unk");
+      if (word === hitWord) entry.classList.add("entry--hit");
+      entry.append(el("span", "w mono", word), el("span", "id mono", String(vocab[word])));
+      return entry;
+    }));
+  }
+
+  function explain(token) {
+    if (token.space) return "Между словами ставим токен «" + SPACE + "» → " + token.id;
+    if (token.known) return "«" + token.word + "» есть в словаре → " + token.id;
+    return "«" + token.word + "» нет в словаре → " + UNK + " = " + token.id;
+  }
+
+  // shown: сколько токенов уже показано; active: какой подсветить (при пошаговом показе).
+  function render(shown, active) {
+    const tokens = tokenize(input.value);
+    const visible = tokens.slice(0, shown === undefined ? tokens.length : shown);
+    const current = active === undefined ? null : tokens[active];
+
+    renderVocab(current ? (current.known ? current.word : UNK) : null);
+
+    tokensEl.replaceChildren(...visible.map((token, i) => {
+      const chip = el("span", "tok");
+      if (token.space) chip.classList.add("tok--space");
+      if (!token.known) chip.classList.add("tok--unk");
+      if (i === active) chip.classList.add("tok--active");
+      chip.append(el("span", "w mono", token.word), el("span", "id mono", String(token.id)));
+      if (!token.known && active === undefined) {
+        const add = el("button", "", "+ в словарь");
+        add.type = "button";
+        add.addEventListener("click", () => addWord(token.word));
+        chip.append(add);
+      }
+      return chip;
+    }));
+
+    const ids = visible.map((token) => token.id);
+    $("ids").textContent = "[" + ids.join(", ") + "]";
+    $("detok").textContent = JSON.stringify(detokenize(ids));
+
+    if (current) {
+      statusEl.textContent = explain(current);
+    } else if (tokens.some((token) => !token.known)) {
+      statusEl.textContent = "Неизвестные слова стали " + UNK + ". Добавьте их в словарь кнопкой под токеном.";
+    } else {
+      statusEl.textContent = tokens.length ? "Все слова нашлись в словаре." : "Введите текст.";
+    }
+    return tokens;
+  }
+
+  function stop() {
+    clearTimeout(timer);
+    timer = null;
+  }
+
+  function play() {
+    stop();
+    const total = tokenize(input.value).length;
+    if (reducedMotion || total === 0) {
+      render();
+      return;
+    }
+    let shown = 0;
+    const tick = () => {
+      shown += 1;
+      if (shown > total) {
+        render();
+        return;
+      }
+      render(shown, shown - 1);
+      timer = setTimeout(tick, STEP_MS);
+    };
+    render(0);
+    statusEl.textContent = "Разбиваем текст на слова…";
+    timer = setTimeout(tick, STEP_MS);
+  }
+
+  function addWord(word) {
+    stop();
+    vocab[word] = nextId();
+    added.add(word);
+    render();
+  }
+
+  input.addEventListener("input", () => { stop(); render(); });
+  $("play").addEventListener("click", play);
+  $("reset").addEventListener("click", () => {
+    stop();
+    vocab = { ...START_VOCAB };
+    added = new Set();
+    input.value = START_TEXT;
+    render();
+  });
+
+  // Тест-хук для локальной проверки: совпадение с выводом из урока.
+  window.__spike = { tokenize, detokenize, ids: (text) => tokenize(text).map((t) => t.id) };
+
+  render();
+
+  /* ---------- диагностика встраивания (только для spike) ---------- */
+
+  function diagnostics() {
+    let inFrame;
+    try { inFrame = window.self !== window.top; } catch (e) { inFrame = true; }
+
+    let parent = "нет";
+    if (inFrame) {
+      if (location.ancestorOrigins && location.ancestorOrigins.length) parent = location.ancestorOrigins[0];
+      else if (document.referrer) parent = new URL(document.referrer).origin;
+      else parent = "неизвестно";
+    }
+
+    let storage;
+    try {
+      localStorage.setItem("__spike", "1");
+      localStorage.removeItem("__spike");
+      storage = "доступен";
+    } catch (e) {
+      storage = "заблокирован";
+    }
+
+    return [
+      "✅ JavaScript работает",
+      "Внутри iframe: " + (inFrame ? "да" : "нет"),
+      "Родительская страница: " + parent,
+      "Ширина области: " + document.documentElement.clientWidth + " px, высота: " + window.innerHeight + " px",
+      "localStorage: " + storage,
+      "Устройство: " + (matchMedia("(pointer: coarse)").matches ? "сенсорное" : "мышь"),
+      "Браузер: " + navigator.userAgent
+    ];
+  }
+
+  function renderDiag() {
+    $("diag-list").replaceChildren(...diagnostics().map((line) => el("li", "", line)));
+  }
+
+  $("copy-diag").addEventListener("click", async () => {
+    const text = diagnostics().join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      $("copy-result").textContent = "✅ скопировано (clipboard работает)";
+    } catch (e) {
+      $("copy-result").textContent = "❌ clipboard заблокирован, выделите список вручную";
+    }
+  });
+
+  addEventListener("resize", renderDiag);
+  renderDiag();
+})();
+</script>
+</body>
+</html>
