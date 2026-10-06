@@ -1,4 +1,4 @@
-# llm-stepik-interactive
+ # llm-stepik-interactive
 
 Интерактивные демо для курса Stepik «LLM своими руками» (#276236).
 Страницы публикуются через GitHub Pages и встраиваются в шаги курса через `<iframe>`.
