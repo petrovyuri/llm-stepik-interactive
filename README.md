@@ -18,6 +18,7 @@
 
 Модуль 3 «Мини-курс Python»:
 
+- [Коробки и операции](https://petrovyuri.github.io/llm-stepik-interactive/m03/arithmetic/) - урок «Переменные, типы, операции»
 - [Цикл по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m03/loop-trace/) - урок «Условия и циклы»
 - [От строки к токенам](https://petrovyuri.github.io/llm-stepik-interactive/m03/text-to-tokens/) - урок «Функции»
 - [Autograd: y = w · x](https://petrovyuri.github.io/llm-stepik-interactive/m03/autograd/) - урок «PyTorch самое нужное»

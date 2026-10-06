@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Коробки и операции</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.boxes { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.box { flex: 1 1 260px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.box--a { border-top: 3px solid var(--cyan); }
+.box--b { border-top: 3px solid var(--purple); }
+.decl { font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.decl b { font-weight: 700; }
+.box--a .decl b { color: var(--cyan); }
+.box--b .decl b { color: var(--purple); }
+.types .chip { padding: 2px 9px; font-size: 13px; }
+.ops { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ops td { padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ops .expr { width: 6.5em; white-space: nowrap; color: var(--muted); }
+.ops .val { overflow-wrap: anywhere; }
+.ops .type { width: 4.5em; text-align: right; }
+.ops .err { color: var(--red); overflow-wrap: anywhere; font-size: 13px; }
+.ops tr.is-now td { background: rgba(249, 115, 22, .14); }
+.badge { display: inline-block; padding: 0 7px; border-radius: 10px; border: 1px solid currentColor; font-size: 12px; }
+.badge--int { color: var(--cyan); }
+.badge--float { color: var(--purple); }
+.badge--str { color: var(--green); }
+.check { margin: 8px 0 0; font-size: 13.5px; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 3 · урок «Переменные, типы, операции»</p>
+<h1>Что операторы делают с числами и строками</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row row--spread">
+    <div class="row" id="presets"></div>
+    <button type="button" class="btn-play" id="play">▶ по шагам</button>
+  </div>
+  <div class="boxes">
+    <div class="box box--a">
+      <div class="row row--spread"><code class="decl" id="decl-a"></code><div class="row types" id="a-types" aria-label="Тип a"></div></div>
+      <div class="slider-holder" id="a-slider"></div>
+    </div>
+    <div class="box box--b">
+      <div class="row row--spread"><code class="decl" id="decl-b"></code><div class="row types" id="b-types" aria-label="Тип b"></div></div>
+      <div class="slider-holder" id="b-slider"></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <table class="ops mono"><tbody id="rows"></tbody></table>
+  <p class="check mono" id="check"></p>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+
+<script type="module">
+import { OPS, TYPES, captions, check, evaluate, literal } from "./logic.js";
+import { el, presets, slider, stepPlayer, ready } from "../../kit/ui.js";
+
+const HINT = "Двигайте ползунки и меняйте типы: результат и его тип пересчитываются сразу.";
+const PRESETS = [
+  { label: "пример урока", value: { a: [10, "int"], b: [3, "int"] } },
+  { label: "2 ** 4", value: { a: [2, "int"], b: [4, "int"] } },
+  { label: "-7 и 2", value: { a: [-7, "int"], b: [2, "int"] } },
+  { label: "строки из input()", value: { a: [10, "str"], b: [3, "str"] } },
+  { label: "деление на 0", value: { a: [10, "int"], b: [0, "int"] } },
+];
+const state = { a: { n: 10, type: "int" }, b: { n: 3, type: "int" } };
+const $ = (id) => document.getElementById(id);
+const caption = $("caption");
+const args = () => [state.a.n, state.a.type, state.b.n, state.b.type];
+
+const rows = OPS.map((op) => {
+  const tr = el("tr", {}, el("td", { class: "expr" }, `a ${op} b`));
+  $("rows").append(tr);
+  return tr;
+});
+
+/** active - номер строки, которую подсвечивает «▶ по шагам»; -1 - обычный вид. */
+function render(active = -1) {
+  for (const name of ["a", "b"]) {
+    $(`decl-${name}`).replaceChildren(el("b", {}, name), ` = ${literal(state[name].n, state[name].type)}`);
+  }
+  evaluate(...args()).forEach((row, i) => {
+    const cells = row.ok
+      ? [el("td", { class: "val" }, row.value), el("td", { class: "type" }, el("span", { class: `badge badge--${row.type}` }, row.type))]
+      : [el("td", { class: "err", colspan: 2 }, row.error)];
+    rows[i].replaceChildren(rows[i].firstChild, ...cells);
+    rows[i].classList.toggle("is-now", i === active);
+  });
+  const result = check(...args());
+  $("check").replaceChildren(...(result
+    ? [el("span", { class: "muted" }, "a == b * (a // b) + a % b → "), el("span", { class: "eq" }, result.text), " ",
+      el("span", { class: result.holds ? "good" : "bad" }, result.holds ? "True" : "False")]
+    : [el("span", { class: "muted" }, "Проверка a == b * (a // b) + a % b работает для чисел, когда b не 0.")]));
+}
+
+const player = stepPlayer($("play"), {
+  steps: () => captions(...args()),
+  onStep(i, text) {
+    caption.textContent = text ?? HINT;
+    render(i);
+  },
+});
+
+/** Любое изменение данных: сначала остановить проигрывание, потом менять состояние. */
+function change(update) {
+  player.stop();
+  update();
+  presetBar.setActive(null);
+  render();
+}
+
+const sliders = {};
+const typeBars = {};
+for (const name of ["a", "b"]) {
+  sliders[name] = slider($(`${name}-slider`), { label: `значение ${name}`, min: -10, max: 10, step: 1, value: state[name].n,
+    onInput: (v) => change(() => { state[name].n = v; }) });
+  typeBars[name] = presets($(`${name}-types`), TYPES.map((type) => ({ label: type, value: type })),
+    (type) => change(() => { state[name].type = type; }));
+  typeBars[name].setActive(TYPES.indexOf(state[name].type));
+}
+
+const presetBar = presets($("presets"), PRESETS, (value) => {
+  player.stop();
+  for (const name of ["a", "b"]) {
+    [state[name].n, state[name].type] = value[name];
+    sliders[name].set(state[name].n);
+    typeBars[name].setActive(TYPES.indexOf(state[name].type));
+  }
+  caption.textContent = HINT;
+  render();
+});
+presetBar.setActive(0);
+
+caption.textContent = HINT;
+render();
+ready();
+</script>
+</body>
+</html>
