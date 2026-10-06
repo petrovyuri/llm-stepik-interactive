@@ -6,7 +6,7 @@
 <style>
 body { margin: 0; padding: 16px; background: #fff; color: #222; font: 14px/1.4 system-ui, sans-serif; }
 table { border-collapse: collapse; margin-bottom: 16px; }
-td, th { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+td, th { border: 1px solid #ccc; padding: 4px 8px; text-align: left; vertical-align: top; }
 #frames { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 iframe { border: 1px solid #999; display: block; flex: none; }   /* не ужимать: ширина 700/360 при любом окне */
 </style>
@@ -14,9 +14,11 @@ iframe { border: 1px solid #999; display: block; flex: none; }   /* не ужи�
 <body>
 <h1>Проверка вёрстки демо</h1>
 <p>Каждое демо из demos.json грузится в iframe шириной 700 и 360 px с высотой из реестра.
-На 700 px содержимое обязано влезть в высоту; горизонтальной прокрутки нет ни на одной ширине.</p>
+На 700 px содержимое обязано влезть в высоту; горизонтальной прокрутки нет ни у страницы,
+ни у её внутренних блоков (обрезанный многоточием текст тоже считается переполнением).
+Сценарии «stress» из реестра нажимают кнопки демо и проверяют каждое промежуточное состояние.</p>
 <table>
-  <thead><tr><th>демо</th><th>ширина</th><th>скрипт</th><th>высота</th><th>гориз. прокрутка</th></tr></thead>
+  <thead><tr><th>демо</th><th>ширина</th><th>состояние</th><th>скрипт</th><th>высота</th><th>гориз. прокрутка</th><th>внутри</th></tr></thead>
   <tbody id="report"></tbody>
 </table>
 <div id="frames"></div>
@@ -27,33 +29,77 @@ const report = document.getElementById("report");
 const frames = document.getElementById("frames");
 const results = [];
 
-function load(src, width, height) {
+function load(frame, src) {
   return new Promise((resolve) => {
-    const frame = document.createElement("iframe");
+    frame.addEventListener("load", () => setTimeout(resolve, 600), { once: true });
     frame.src = src;
-    frame.width = width;
-    frame.height = height;
-    frame.addEventListener("load", () => setTimeout(() => resolve(frame), 600));
-    frames.append(frame);
   });
+}
+
+function describe(node) {
+  return node.tagName.toLowerCase() + (node.id ? `#${node.id}` : node.className ? `.${String(node.className).split(" ")[0]}` : "");
+}
+
+/** Замер одного состояния: высота, прокрутка страницы и блоки с переполнением внутри. */
+function inspect(frame) {
+  const win = frame.contentWindow;
+  const root = frame.contentDocument.documentElement;
+  const inner = [...frame.contentDocument.querySelectorAll("body *")]
+    .filter((node) => !["INPUT", "TEXTAREA"].includes(node.tagName))
+    .filter((node) => win.getComputedStyle(node).overflowX !== "visible" && node.scrollWidth > node.clientWidth + 1)
+    .map(describe);
+  return { ready: root.dataset.ready === "1", height: root.scrollHeight, overflowX: root.scrollWidth > root.clientWidth, inner };
+}
+
+function record(demo, width, label, state) {
+  const fits = width !== 700 || state.height <= demo.height;
+  const ok = state.ready && fits && !state.overflowX && state.inner.length === 0 && !state.error;
+  results.push({ slug: demo.slug, width, label, ...state, limit: demo.height, ok });
+  const row = document.createElement("tr");
+  row.innerHTML = `<td>${ok ? "✅" : "❌"} ${demo.slug}</td><td>${width}</td><td>${label}</td>`
+    + `<td>${state.error ?? (state.ready ? "ok" : "НЕ ОТРАБОТАЛ")}</td>`
+    + `<td>${state.height} / ${demo.height}${fits ? "" : " ПЕРЕПОЛНЕНИЕ"}</td>`
+    + `<td>${state.overflowX ? "ЕСТЬ" : "нет"}</td><td>${[...new Set(state.inner)].slice(0, 4).join(", ") || "-"}</td>`;
+  report.append(row);
+}
+
+/** Худшее из состояний: максимальная высота, любая прокрутка, все переполненные блоки. */
+function worse(a, b) {
+  return {
+    ready: a.ready && b.ready,
+    height: Math.max(a.height, b.height),
+    overflowX: a.overflowX || b.overflowX,
+    inner: [...a.inner, ...b.inner],
+  };
 }
 
 for (const demo of demos) {
   for (const width of WIDTHS) {
-    const frame = await load(`../${demo.slug}/`, width, demo.height);
-    const root = frame.contentDocument.documentElement;
-    const ready = root.dataset.ready === "1";
-    const height = root.scrollHeight;
-    const overflowX = root.scrollWidth > root.clientWidth;
-    const fits = width !== 700 || height <= demo.height;
-    const ok = ready && fits && !overflowX;
-    results.push({ slug: demo.slug, width, ready, height, limit: demo.height, overflowX, ok });
-    const row = document.createElement("tr");
-    row.innerHTML = `<td>${ok ? "✅" : "❌"} ${demo.slug}</td><td>${width}</td>`
-      + `<td>${ready ? "ok" : "НЕ ОТРАБОТАЛ"}</td>`
-      + `<td>${height} / ${demo.height}${fits ? "" : " ПЕРЕПОЛНЕНИЕ"}</td>`
-      + `<td>${overflowX ? "ЕСТЬ" : "нет"}</td>`;
-    report.append(row);
+    const frame = document.createElement("iframe");
+    frame.width = width;
+    frame.height = demo.height;
+    frames.append(frame);
+    const src = `../${demo.slug}/`;
+    await load(frame, src);
+    record(demo, width, "первый экран", inspect(frame));
+
+    for (const [index, sequence] of (demo.stress ?? []).entries()) {
+      await load(frame, `${src}?stress=${index}`);
+      let state = inspect(frame);
+      try {
+        for (const step of sequence) {
+          for (let k = 0; k < (step.times ?? 1); k += 1) {
+            const target = frame.contentDocument.querySelector(step.click);
+            if (!target) throw new Error(`нет ${step.click}`);
+            target.click();
+            state = worse(state, inspect(frame));
+          }
+        }
+      } catch (error) {
+        state.error = error.message;
+      }
+      record(demo, width, `нагрузка ${index + 1}`, state);
+    }
   }
 }
 window.__layout = { ok: results.every((r) => r.ok), results };

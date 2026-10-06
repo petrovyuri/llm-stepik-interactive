@@ -29,9 +29,11 @@ export function run(w0, lr, n) {
   return rows;
 }
 
-/** Спуск разлетелся: отклонение от минимума больше миллиона. */
+/** Спуск разлетелся: точка ушла от минимума дальше чем на 100 (в 20 раз дальше края графика). */
+export const DIVERGED = 100;
+
 export function diverged(w) {
-  return Math.abs(w - TARGET) > 1e6;
+  return Math.abs(w - TARGET) > DIVERGED;
 }
 
 /** Что говорит знак производной. */

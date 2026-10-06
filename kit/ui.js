@@ -165,8 +165,7 @@ export function matrixView(container, values, { editable = false, onEdit = () =>
     cells = m.map((row, i) => row.map((v, j) => (editable
       ? el("input", {
         class: "matrix__cell",
-        type: "text",
-        inputmode: "decimal",
+        type: "text",          // без inputmode="decimal": на iPhone в той клавиатуре нет минуса
         autocomplete: "off",
         value: show(v),
         "aria-label": `${label} [${i + 1}, ${j + 1}]`,
@@ -186,7 +185,9 @@ export function matrixView(container, values, { editable = false, onEdit = () =>
     m.forEach((row, i) => row.forEach((v, j) => {
       const cell = cells[i][j];
       if (editable) {
-        if (document.activeElement !== cell) cell.value = show(v);
+        // Пишем только изменившееся: при наборе значение совпадает и каретка остаётся на месте,
+        // а пресет обновит и ячейку с фокусом (в Safari кнопка фокус у поля не забирает).
+        if (cell.value !== show(v)) cell.value = show(v);
       } else {
         cell.textContent = show(v);
       }

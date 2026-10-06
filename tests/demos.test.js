@@ -36,5 +36,16 @@ for (const demo of demos) {
     for (const file of ["index.html", "logic.js", "golden.json"]) {
       assert.ok(existsSync(join(root, demo.slug, file)), `нет ${demo.slug}/${file}`);
     }
+    // stress - сценарии для tests/layout.html: [[{ click: "<селектор>", times: N }, ...], ...]
+    if ("stress" in demo) {
+      assert.ok(Array.isArray(demo.stress), "stress - массив сценариев");
+      for (const sequence of demo.stress) {
+        assert.ok(Array.isArray(sequence) && sequence.length > 0, "сценарий - непустой массив шагов");
+        for (const step of sequence) {
+          assert.equal(typeof step.click, "string", "шаг: click - CSS-селектор");
+          if ("times" in step) assert.ok(Number.isInteger(step.times) && step.times >= 1, "шаг: times - целое ≥ 1");
+        }
+      }
+    }
   });
 }

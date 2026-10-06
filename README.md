@@ -18,4 +18,5 @@
 
     node --test
 
-Вёрстка: открыть `tests/layout.html` через локальный сервер, например `py -m http.server`.
+Вёрстка: запустить `py -3.11 tests/serve.py 8767` (сервер без кеша браузера) и открыть
+http://localhost:8767/tests/layout.html - стенд проверяет первый экран и сценарии `stress` из `demos.json`.

@@ -23,6 +23,15 @@
 .sm[data-step="3"] .sum-p { visibility: hidden; }
 .sm[data-step="0"] .c1, .sm[data-step="1"] .c2, .sm[data-step="2"] .sum-exp,
 .sm[data-step="3"] :is(.c3, .c4), .sm[data-step="4"] .sum-p { color: var(--orange); }
+/* На телефоне таблица не влезает: промежуточные колонки прячем (их числа есть в подписях
+   «по шагам»), чтобы вероятности и столбики оставались видны без прокрутки вбок. */
+@media (max-width: 520px) {
+  .sm .c1, .sm .c2 { display: none; }
+  .sm th, .sm td { padding: 4px 3px; }
+  .sm .name input { width: 72px; }
+  .sm .logit input { width: 46px; }
+  .bar { min-width: 64px; }
+}
 </style>
 </head>
 <body>
@@ -46,7 +55,7 @@
     <table class="sm mono" id="table">
       <thead><tr><th>вариант</th><th>логит</th><th class="c1">логит / T</th><th class="c2">e^(логит / T)</th><th class="c3">вероятность</th><th class="c4"></th></tr></thead>
       <tbody id="rows"></tbody>
-      <tfoot><tr><td></td><td></td><td class="muted">сумма</td><td class="sum-exp" id="sum-exp"></td><td class="sum-p" id="sum-p"></td><td></td></tr></tfoot>
+      <tfoot><tr><td></td><td class="muted">сумма</td><td class="c1"></td><td class="c2 sum-exp" id="sum-exp"></td><td class="c3 sum-p" id="sum-p"></td><td class="c4"></td></tr></tfoot>
     </table>
   </div>
   <p class="caption" id="caption"></p>
@@ -62,8 +71,8 @@ const LIMIT = 20;   // логиты от -20 до 20
 const T_CHIPS = [0.7, 1, 1.5];
 const COLORS = ["var(--cyan)", "var(--purple)", "var(--green)", "var(--yellow)"];
 const PRESETS = [
-  { label: "Жюри из урока", value: { names: ["Николай", "Антон", "Федор", "Юрий"], logits: [12, 11, -3, 4] } },
-  { label: "[2, 1, 0]", value: { names: ["A", "B", "C"], logits: [2, 1, 0] } },
+  { label: "Жюри из урока", value: { names: ["Николай", "Антон", "Федор", "Юрий"], logits: [12, 11, -3, 4], T: 1 } },
+  { label: "[2, 1, 0]", value: { names: ["A", "B", "C"], logits: [2, 1, 0], T: 1 } },
 ];
 
 const state = { names: [...PRESETS[0].value.names], logits: PRESETS[0].value.logits.map(String), T: 1 };
@@ -82,7 +91,7 @@ function buildRows() {
   cells = state.names.map((name, i) => {
     const row = {
       logit: el("input", {
-        type: "text", inputmode: "decimal", value: state.logits[i], "aria-label": `Логит варианта ${i + 1}`,
+        type: "text", value: state.logits[i], "aria-label": `Логит варианта ${i + 1}`,
         oninput: (e) => { state.logits[i] = e.target.value; player.stop(); presetBar.setActive(null); render(); },
       }),
       c1: el("td", { class: "c1" }),
@@ -165,12 +174,13 @@ const tChips = presets(document.getElementById("t-chips"),
   (t) => { tSlider.set(t); setT(t); });
 tChips.setActive(1);
 
+// Пресет - пример урока целиком: варианты, логиты и T = 1, как в уроке.
 const presetBar = presets(document.getElementById("presets"), PRESETS, (value) => {
-  player.stop();
   state.names = [...value.names];
   state.logits = value.logits.map(String);
   buildRows();
-  render();
+  tSlider.set(value.T);
+  setT(value.T);
 });
 presetBar.setActive(0);
 

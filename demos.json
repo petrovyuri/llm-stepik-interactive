@@ -1,7 +1,24 @@
 [
-  { "slug": "m02/dot-product", "module": 2, "lesson": 1, "title": "Скалярное произведение = похожесть", "height": 540 },
-  { "slug": "m02/matmul", "module": 2, "lesson": 1, "title": "Умножение матриц по шагам", "height": 560 },
-  { "slug": "m02/tensor-shape", "module": 2, "lesson": 1, "title": "Форма тензора и reshape", "height": 560 },
-  { "slug": "m02/softmax-temperature", "module": 2, "lesson": 2, "title": "Softmax и температура", "height": 520 },
-  { "slug": "m02/gradient-descent", "module": 2, "lesson": 3, "title": "Градиентный спуск", "height": 590 }
+  { "slug": "m02/dot-product", "module": 2, "lesson": 1, "title": "Скалярное произведение = похожесть", "height": 540,
+    "stress": [[{ "click": "#presets .chip:nth-child(2)" }, { "click": "#presets .chip:nth-child(3)" }, { "click": "#play" }]] },
+  { "slug": "m02/matmul", "module": 2, "lesson": 1, "title": "Умножение матриц по шагам", "height": 560,
+    "stress": [[
+      { "click": "#a-tools button[aria-label='Добавить строку A']", "times": 3 },
+      { "click": "#a-tools button[aria-label='Добавить столбец A']", "times": 3 },
+      { "click": "#b-tools button[aria-label='Добавить строку B']", "times": 3 },
+      { "click": "#b-tools button[aria-label='Добавить столбец B']", "times": 3 },
+      { "click": "#play" }
+    ], [{ "click": "#presets .chip:nth-child(4)" }, { "click": "#presets .chip:nth-child(2)" }]] },
+  { "slug": "m02/tensor-shape", "module": 2, "lesson": 1, "title": "Форма тензора и reshape", "height": 560,
+    "stress": [[{ "click": "#ranks-bar .chip:nth-child(1)" }, { "click": "#ranks-bar .chip:nth-child(2)" },
+      { "click": "#tab-reshape" }, { "click": "#targets .chip:nth-child(6)" }, { "click": "#targets .chip:nth-child(1)" }]] },
+  { "slug": "m02/softmax-temperature", "module": 2, "lesson": 2, "title": "Softmax и температура", "height": 520,
+    "stress": [[{ "click": "#t-chips .chip:nth-child(1)" }, { "click": "#t-chips .chip:nth-child(3)" },
+      { "click": "#presets .chip:nth-child(2)" }, { "click": "#play" }]] },
+  { "slug": "m02/gradient-descent", "module": 2, "lesson": 3, "title": "Градиентный спуск", "height": 590,
+    "stress": [
+      [{ "click": "#presets .chip:nth-child(4)" }, { "click": "#step", "times": 160 }],
+      [{ "click": "#presets .chip:nth-child(3)" }, { "click": "#step", "times": 30 }],
+      [{ "click": "#step", "times": 30 }]
+    ] }
 ]

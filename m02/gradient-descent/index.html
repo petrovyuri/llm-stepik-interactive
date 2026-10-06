@@ -41,6 +41,7 @@
       <p class="caption" id="caption"></p>
     </div>
     <table class="history mono">
+      <colgroup><col style="width: 34px"><col style="width: 64px"><col style="width: 74px"><col style="width: 64px"><col style="width: 64px"></colgroup>
       <thead><tr><th>n</th><th>w</th><th>L(w)</th><th>dL/dw</th><th>w_нов</th></tr></thead>
       <tbody id="history"></tbody>
     </table>
@@ -48,7 +49,7 @@
 </div>
 
 <script type="module">
-import { diverged, grad, loss, run, stepFormula, verdict } from "./logic.js";
+import { DIVERGED, diverged, grad, loss, run, stepFormula, verdict } from "./logic.js";
 import { num } from "../../kit/format.js";
 import { el, svg, presets, slider, stepPlayer, ready } from "../../kit/ui.js";
 
@@ -90,7 +91,7 @@ for (let w = W_MIN; w <= W_MAX; w += 1) {
   plot.append(svg("line", { x1: X(w), y1: Y(0), x2: X(w), y2: Y(0) + 4, stroke: "var(--muted)" }));
   plot.append(text(String(w), { x: X(w), y: Y(0) + 17, "text-anchor": "middle" }));
 }
-plot.append(text("L(w)", { x: 4, y: VIEW.top + 10 }), text("w", { x: VIEW.w - VIEW.right, y: Y(0) - 6, "text-anchor": "end" }));
+plot.append(text("L(w) = (w - 3)²", { x: 4, y: VIEW.top + 10 }), text("w", { x: VIEW.w - VIEW.right, y: Y(0) - 6, "text-anchor": "end" }));
 const curve = [];
 for (let k = 0; k <= 200; k += 1) {
   const w = W_MIN + (k / 200) * (W_MAX - W_MIN);
@@ -140,11 +141,11 @@ function render() {
     stepButton.disabled = true;
     document.getElementById("now").textContent = `w = ${num(w)}`;
     document.getElementById("formula").textContent = "";
-    verdictEl.textContent = "Спуск разлетелся: w ушла от минимума больше чем на миллион. Уменьшите η и нажмите «сброс».";
+    verdictEl.textContent = `Спуск разлетелся: w ушла от минимума дальше чем на ${DIVERGED}. Уменьшите η или нажмите «сброс».`;
     verdictEl.className = "verdict bad";
   } else {
     stepButton.disabled = false;
-    document.getElementById("now").textContent = `w = ${num(w)}, L(w) = (w - 3)² = ${num(loss(w))}`;
+    document.getElementById("now").textContent = `w = ${num(w)}, L(w) = ${num(loss(w))}`;
     document.getElementById("formula").textContent = stepFormula(w, state.lr);
     verdictEl.textContent = verdict(w);
     verdictEl.className = `verdict ${Math.abs(grad(w)) < 1e-9 ? "good" : "muted"}`;
