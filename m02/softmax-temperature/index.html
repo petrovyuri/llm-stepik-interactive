@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Softmax и температура</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.table-wrap { overflow-x: auto; }
+.sm { width: 100%; border-collapse: collapse; font-size: 14px; }
+.sm th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12.5px; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.sm td { padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.sm input { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 14px; }
+.sm .name input { width: 92px; font-family: inherit; }
+.sm .logit input { width: 64px; }
+.sm input.is-invalid { border-color: var(--red); color: var(--red); }
+.bar { position: relative; height: 18px; min-width: 110px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.bar__fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width .25s; }
+.bar__text { position: relative; padding-left: 6px; font-size: 12.5px; line-height: 18px; }
+.sm[data-step="0"] :is(.c2, .c3, .c4, .sum-exp, .sum-p),
+.sm[data-step="1"] :is(.c3, .c4, .sum-exp, .sum-p),
+.sm[data-step="2"] :is(.c3, .c4, .sum-p),
+.sm[data-step="3"] .sum-p { visibility: hidden; }
+.sm[data-step="0"] .c1, .sm[data-step="1"] .c2, .sm[data-step="2"] .sum-exp,
+.sm[data-step="3"] :is(.c3, .c4), .sm[data-step="4"] .sum-p { color: var(--orange); }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 2 · урок 2</p>
+<h1>Как softmax превращает баллы в вероятности</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row row--spread">
+    <div class="row" id="presets"></div>
+    <button type="button" class="btn-play" id="play">▶ по шагам</button>
+  </div>
+  <div class="row row--top">
+    <div class="slider-holder" id="t-slider"></div>
+    <div class="row" id="t-chips"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="table-wrap">
+    <table class="sm mono" id="table">
+      <thead><tr><th>вариант</th><th>логит</th><th class="c1">логит / T</th><th class="c2">e^(логит / T)</th><th class="c3">вероятность</th><th class="c4"></th></tr></thead>
+      <tbody id="rows"></tbody>
+      <tfoot><tr><td></td><td></td><td class="muted">сумма</td><td class="sum-exp" id="sum-exp"></td><td class="sum-p" id="sum-p"></td><td></td></tr></tfoot>
+    </table>
+  </div>
+  <p class="caption" id="caption"></p>
+  <p class="readout" id="result" aria-live="polite"></p>
+</div>
+
+<script type="module">
+import { exps, expSum, scaled, softmax, steps } from "./logic.js";
+import { expo, fixed, num, parseNumber, percent } from "../../kit/format.js";
+import { el, presets, slider, stepPlayer, ready } from "../../kit/ui.js";
+
+const LIMIT = 20;   // логиты от -20 до 20
+const T_CHIPS = [0.7, 1, 1.5];
+const COLORS = ["var(--cyan)", "var(--purple)", "var(--green)", "var(--yellow)"];
+const PRESETS = [
+  { label: "Жюри из урока", value: { names: ["Николай", "Антон", "Федор", "Юрий"], logits: [12, 11, -3, 4] } },
+  { label: "[2, 1, 0]", value: { names: ["A", "B", "C"], logits: [2, 1, 0] } },
+];
+
+const state = { names: [...PRESETS[0].value.names], logits: PRESETS[0].value.logits.map(String), T: 1 };
+const table = document.getElementById("table");
+const rowsEl = document.getElementById("rows");
+const caption = document.getElementById("caption");
+const result = document.getElementById("result");
+let cells = [];
+
+function values() {
+  return state.logits.map((t) => parseNumber(t, LIMIT));
+}
+
+function buildRows() {
+  rowsEl.replaceChildren();
+  cells = state.names.map((name, i) => {
+    const row = {
+      logit: el("input", {
+        type: "text", inputmode: "decimal", value: state.logits[i], "aria-label": `Логит варианта ${i + 1}`,
+        oninput: (e) => { state.logits[i] = e.target.value; player.stop(); presetBar.setActive(null); render(); },
+      }),
+      c1: el("td", { class: "c1" }),
+      c2: el("td", { class: "c2" }),
+      c3: el("td", { class: "c3" }),
+      fill: el("span", { class: "bar__fill", style: `background: ${COLORS[i]}; width: 0` }),
+      text: el("span", { class: "bar__text" }),
+    };
+    const nameInput = el("input", {
+      type: "text", value: name, "aria-label": `Название варианта ${i + 1}`,
+      oninput: (e) => { state.names[i] = e.target.value; render(); },
+    });
+    rowsEl.append(el("tr", {},
+      el("td", { class: "name" }, nameInput),
+      el("td", { class: "logit" }, row.logit),
+      row.c1, row.c2, row.c3,
+      el("td", { class: "c4" }, el("div", { class: "bar" }, row.fill, row.text))));
+    return row;
+  });
+}
+
+function render() {
+  const logits = values();
+  cells.forEach((row, i) => row.logit.classList.toggle("is-invalid", logits[i] === null));
+  if (logits.some((v) => v === null)) {
+    for (const row of cells) {
+      row.c1.textContent = row.c2.textContent = row.c3.textContent = row.text.textContent = "";
+      row.fill.style.width = "0";
+    }
+    document.getElementById("sum-exp").textContent = "";
+    document.getElementById("sum-p").textContent = "";
+    result.className = "error";
+    result.textContent = `Логит должен быть числом от -${LIMIT} до ${LIMIT}`;
+    return;
+  }
+  const T = state.T;
+  const s = scaled(logits, T);
+  const e = exps(logits, T);
+  const p = softmax(logits, T);
+  cells.forEach((row, i) => {
+    row.c1.textContent = num(s[i], 3);
+    row.c2.textContent = expo(e[i]);
+    row.c3.textContent = fixed(p[i], 3);
+    row.fill.style.width = `${(p[i] * 100).toFixed(2)}%`;
+    row.text.textContent = percent(p[i]);
+  });
+  let total = 0;
+  for (const v of p) total += v;
+  document.getElementById("sum-exp").textContent = expo(expSum(logits, T));
+  document.getElementById("sum-p").textContent = fixed(total, 3);
+  result.className = "readout";
+  result.textContent = state.names.map((name, i) => `${name || `вариант ${i + 1}`}: ${percent(p[i])}`).join(" · ");
+}
+
+const player = stepPlayer(document.getElementById("play"), {
+  steps: () => {
+    const logits = values();
+    return logits.some((v) => v === null) ? [] : steps(logits, state.T);
+  },
+  onStep(i, text) {
+    caption.textContent = text ?? "";
+    if (i === -1) delete table.dataset.step;
+    else table.dataset.step = String(i);
+  },
+});
+
+function setT(t) {
+  state.T = t;
+  const chip = T_CHIPS.indexOf(t);
+  tChips.setActive(chip === -1 ? null : chip);
+  player.stop();
+  render();
+}
+
+const tSlider = slider(document.getElementById("t-slider"), {
+  label: "температура T", min: 0.1, max: 3, step: 0.1, value: 1, format: (v) => num(v), onInput: setT,
+});
+const tChips = presets(document.getElementById("t-chips"),
+  T_CHIPS.map((t) => ({ label: `T = ${num(t)}`, value: t })),
+  (t) => { tSlider.set(t); setT(t); });
+tChips.setActive(1);
+
+const presetBar = presets(document.getElementById("presets"), PRESETS, (value) => {
+  player.stop();
+  state.names = [...value.names];
+  state.logits = value.logits.map(String);
+  buildRows();
+  render();
+});
+presetBar.setActive(0);
+
+buildRows();
+render();
+ready();
+</script>
+</body>
+</html>
