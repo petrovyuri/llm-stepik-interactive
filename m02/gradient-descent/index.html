@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Градиентный спуск</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+#plot { width: 100%; height: auto; display: block; }
+.gd-bottom { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin-top: 6px; }
+.gd-text { flex: 1 1 260px; min-width: 0; display: grid; gap: 4px; }
+/* ширина таблицы фиксирована: огромные числа при разлёте не должны выталкивать её под текст */
+.history { border-collapse: collapse; font-size: 12.5px; flex: none; width: 300px; max-width: 100%; table-layout: fixed; }
+.history th, .history td { padding: 2px 6px; text-align: right; border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history th { color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 2 · урок 3</p>
+<h1>Как градиентный спуск ищет минимум</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row" id="presets"></div>
+  <div class="row row--top">
+    <div class="slider-holder" id="w-slider"></div>
+    <div class="slider-holder" id="lr-slider"></div>
+    <button type="button" id="step">шаг</button>
+    <button type="button" class="btn-play" id="play">▶ 10 шагов</button>
+    <button type="button" id="reset">сброс</button>
+  </div>
+</div>
+
+<div class="panel">
+  <svg id="plot" viewBox="0 0 640 200" aria-label="График L(w) = (w - 3)² с текущей точкой спуска"></svg>
+  <div class="gd-bottom">
+    <div class="gd-text">
+      <p class="readout" id="now" aria-live="polite"></p>
+      <p class="readout" id="formula"></p>
+      <p class="verdict" id="verdict"></p>
+      <p class="caption" id="caption"></p>
+    </div>
+    <table class="history mono">
+      <thead><tr><th>n</th><th>w</th><th>L(w)</th><th>dL/dw</th><th>w_нов</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+import { diverged, grad, loss, run, stepFormula, verdict } from "./logic.js";
+import { num } from "../../kit/format.js";
+import { el, svg, presets, slider, stepPlayer, ready } from "../../kit/ui.js";
+
+const W_MIN = -2;
+const W_MAX = 8;
+const L_MAX = 26;
+const VIEW = { w: 640, h: 200, left: 40, right: 12, top: 10, bottom: 26 };
+const SHOW_ROWS = 4;
+const X = (w) => VIEW.left + ((w - W_MIN) / (W_MAX - W_MIN)) * (VIEW.w - VIEW.left - VIEW.right);
+const Y = (l) => VIEW.h - VIEW.bottom - (l / L_MAX) * (VIEW.h - VIEW.top - VIEW.bottom);
+const clampW = (w) => Math.max(W_MIN, Math.min(W_MAX, w));
+
+const PRESETS = [
+  { label: "Пример 1: w = 5", value: { w0: 5, lr: 0.1 } },
+  { label: "Пример 2: w = 1", value: { w0: 1, lr: 0.1 } },
+  { label: "η = 1.0: качели", value: { w0: 5, lr: 1 } },
+  { label: "η = 1.05: разлёт", value: { w0: 5, lr: 1.05 } },
+];
+
+const state = { w0: 5, lr: 0.1, history: [] };
+const current = () => (state.history.length ? state.history[state.history.length - 1].next : state.w0);
+
+// ---------- статичная часть графика ----------
+const plot = document.getElementById("plot");
+function text(content, attrs) {
+  const node = svg("text", { fill: "var(--muted)", "font-size": 12, ...attrs });
+  node.textContent = content;
+  return node;
+}
+const defs = svg("defs");
+const marker = svg("marker", { id: "head", viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
+marker.append(svg("path", { d: "M0,0 L10,5 L0,10 z", fill: "var(--orange)" }));
+const clip = svg("clipPath", { id: "area" });
+clip.append(svg("rect", { x: VIEW.left, y: VIEW.top, width: VIEW.w - VIEW.left - VIEW.right, height: VIEW.h - VIEW.top - VIEW.bottom }));
+defs.append(marker, clip);
+plot.append(defs);
+plot.append(svg("line", { x1: VIEW.left, y1: Y(0), x2: VIEW.w - VIEW.right, y2: Y(0), stroke: "var(--line)" }));
+for (let w = W_MIN; w <= W_MAX; w += 1) {
+  plot.append(svg("line", { x1: X(w), y1: Y(0), x2: X(w), y2: Y(0) + 4, stroke: "var(--muted)" }));
+  plot.append(text(String(w), { x: X(w), y: Y(0) + 17, "text-anchor": "middle" }));
+}
+plot.append(text("L(w)", { x: 4, y: VIEW.top + 10 }), text("w", { x: VIEW.w - VIEW.right, y: Y(0) - 6, "text-anchor": "end" }));
+const curve = [];
+for (let k = 0; k <= 200; k += 1) {
+  const w = W_MIN + (k / 200) * (W_MAX - W_MIN);
+  curve.push(`${k ? "L" : "M"}${X(w).toFixed(1)},${Y(loss(w)).toFixed(1)}`);
+}
+plot.append(svg("path", { d: curve.join(" "), fill: "none", stroke: "var(--cyan)", "stroke-width": 2.5, "clip-path": "url(#area)" }));
+plot.append(svg("circle", { cx: X(3), cy: Y(0), r: 4, fill: "var(--green)" }),
+  text("минимум w = 3", { x: X(3), y: Y(0) - 8, "text-anchor": "middle", fill: "var(--green)" }));
+const dynamic = svg("g", { "clip-path": "url(#area)" });
+const pointLayer = svg("g");
+plot.append(dynamic, pointLayer);
+
+// ---------- текущее состояние на графике ----------
+function drawPlot() {
+  dynamic.replaceChildren();
+  pointLayer.replaceChildren();
+  for (const row of state.history) {
+    dynamic.append(svg("circle", { cx: X(row.w), cy: Y(loss(row.w)), r: 3.5, fill: "var(--muted)", opacity: 0.6 }));
+  }
+  const w = current();
+  if (diverged(w)) return;
+  const g = grad(w);
+  // касательная: прямая с наклоном dL/dw через текущую точку
+  dynamic.append(svg("line", {
+    x1: X(w - 1.2), y1: Y(loss(w) - 1.2 * g), x2: X(w + 1.2), y2: Y(loss(w) + 1.2 * g),
+    stroke: "var(--yellow)", "stroke-width": 2, "stroke-dasharray": "6 5",
+  }));
+  const next = w - state.lr * g;
+  if (Math.abs(next - w) > 1e-9) {
+    dynamic.append(svg("line", { x1: X(w), y1: Y(loss(w)), x2: X(next), y2: Y(loss(next)), stroke: "var(--orange)", "stroke-width": 2.5, "marker-end": "url(#head)" }));
+  }
+  pointLayer.append(svg("circle", { cx: X(clampW(w)), cy: Y(Math.min(loss(w), L_MAX)), r: 7, fill: "var(--cyan)", stroke: "var(--bg)", "stroke-width": 2 }));
+  if (w < W_MIN || w > W_MAX) {
+    const right = w > W_MAX;
+    pointLayer.append(text(`w = ${num(w)} за пределами графика`, {
+      x: X(clampW(w)) + (right ? -10 : 10), y: VIEW.top + 14, "text-anchor": right ? "end" : "start", fill: "var(--red)",
+    }));
+  }
+}
+
+function render() {
+  drawPlot();
+  const w = current();
+  const stepButton = document.getElementById("step");
+  const verdictEl = document.getElementById("verdict");
+  if (diverged(w)) {
+    stepButton.disabled = true;
+    document.getElementById("now").textContent = `w = ${num(w)}`;
+    document.getElementById("formula").textContent = "";
+    verdictEl.textContent = "Спуск разлетелся: w ушла от минимума больше чем на миллион. Уменьшите η и нажмите «сброс».";
+    verdictEl.className = "verdict bad";
+  } else {
+    stepButton.disabled = false;
+    document.getElementById("now").textContent = `w = ${num(w)}, L(w) = (w - 3)² = ${num(loss(w))}`;
+    document.getElementById("formula").textContent = stepFormula(w, state.lr);
+    verdictEl.textContent = verdict(w);
+    verdictEl.className = `verdict ${Math.abs(grad(w)) < 1e-9 ? "good" : "muted"}`;
+  }
+  document.getElementById("history").replaceChildren(...state.history.slice(-SHOW_ROWS).map((row) => el("tr", {},
+    el("td", {}, String(row.n)), el("td", {}, num(row.w)), el("td", {}, num(row.loss)),
+    el("td", {}, num(row.grad)), el("td", {}, num(row.next)))));
+}
+
+function doStep() {
+  if (diverged(current())) return;
+  const [row] = run(current(), state.lr, 1);
+  state.history.push({ ...row, n: state.history.length + 1 });
+  render();
+}
+
+const caption = document.getElementById("caption");
+const player = stepPlayer(document.getElementById("play"), {
+  steps: () => run(current(), state.lr, 10)
+    .filter((row) => !diverged(row.w))
+    .map((row, k) => `Шаг ${state.history.length + k + 1}: ${stepFormula(row.w, state.lr)}`),
+  onStep(i, text) {
+    caption.textContent = text ?? "";
+    if (i >= 0) doStep();
+  },
+  interval: 450,
+});
+
+function restart() {
+  player.stop();
+  presetBar.setActive(null);
+  state.history = [];
+  render();
+}
+
+const wSlider = slider(document.getElementById("w-slider"), {
+  label: "старт w", min: -1, max: 7, step: 0.1, value: 5, format: (v) => num(v),
+  onInput: (v) => { state.w0 = v; restart(); },
+});
+const lrSlider = slider(document.getElementById("lr-slider"), {
+  label: "η (learning rate)", min: 0.01, max: 1.2, step: 0.01, value: 0.1, format: (v) => num(v),
+  onInput: (v) => { state.lr = v; restart(); },
+});
+
+const presetBar = presets(document.getElementById("presets"), PRESETS, (value) => {
+  player.stop();
+  state.w0 = value.w0;
+  state.lr = value.lr;
+  wSlider.set(value.w0);
+  lrSlider.set(value.lr);
+  state.history = [];
+  render();
+});
+presetBar.setActive(0);
+
+document.getElementById("step").addEventListener("click", () => { player.stop(); doStep(); });
+document.getElementById("reset").addEventListener("click", () => { player.stop(); state.history = []; render(); });
+
+render();
+ready();
+</script>
+</body>
+</html>

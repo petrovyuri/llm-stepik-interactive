@@ -2,5 +2,6 @@
   { "slug": "m02/dot-product", "module": 2, "lesson": 1, "title": "Скалярное произведение = похожесть", "height": 540 },
   { "slug": "m02/matmul", "module": 2, "lesson": 1, "title": "Умножение матриц по шагам", "height": 560 },
   { "slug": "m02/tensor-shape", "module": 2, "lesson": 1, "title": "Форма тензора и reshape", "height": 560 },
-  { "slug": "m02/softmax-temperature", "module": 2, "lesson": 2, "title": "Softmax и температура", "height": 520 }
+  { "slug": "m02/softmax-temperature", "module": 2, "lesson": 2, "title": "Softmax и температура", "height": 520 },
+  { "slug": "m02/gradient-descent", "module": 2, "lesson": 3, "title": "Градиентный спуск", "height": 590 }
 ]
