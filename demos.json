@@ -1,3 +1,4 @@
 [
-  { "slug": "m02/dot-product", "module": 2, "lesson": 1, "title": "Скалярное произведение = похожесть", "height": 540 }
+  { "slug": "m02/dot-product", "module": 2, "lesson": 1, "title": "Скалярное произведение = похожесть", "height": 540 },
+  { "slug": "m02/matmul", "module": 2, "lesson": 1, "title": "Умножение матриц по шагам", "height": 560 }
 ]
