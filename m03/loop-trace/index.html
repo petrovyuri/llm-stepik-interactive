@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Цикл по шагам</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.prog { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.code { margin: 0; padding: 8px 0; flex: 1 1 300px; min-width: 0; list-style: none; counter-reset: line;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+.code li { display: flex; min-height: 1.5em; padding-right: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.code li::before { counter-increment: line; content: counter(line); flex: none; width: 2.6em; padding-right: 10px; text-align: right; color: var(--muted); }
+.code li.is-now { background: rgba(249, 115, 22, .18); box-shadow: inset 3px 0 var(--orange); }
+.side { flex: 1 1 200px; min-width: 0; display: grid; gap: 8px; }
+.label { margin: 0 0 4px; font-size: 12.5px; }
+.vars { border-collapse: collapse; font-size: 14px; }
+.vars td { padding: 2px 10px 2px 0; border-bottom: 1px solid var(--line); }
+.console { margin: 0; min-height: 76px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; white-space: pre-wrap; font-size: 14px; }
+.field { flex: 1 1 200px; min-width: 0; padding: 6px 10px; font-size: 14px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+.field.is-invalid { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 3 · урок «Условия и циклы»</p>
+<h1>Как Python проходит по циклу</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row" id="programs"></div>
+  <div class="row row--top" id="params"></div>
+  <div class="row row--top">
+    <button type="button" id="step">шаг</button>
+    <button type="button" class="btn-play" id="play">▶ до конца</button>
+    <button type="button" id="reset">сброс</button>
+    <span class="muted" id="counter"></span>
+  </div>
+</div>
+
+<div class="panel prog">
+  <ol class="code mono" id="code" aria-label="Код программы"></ol>
+  <div class="side">
+    <div><p class="muted label">Переменные</p><table class="vars mono" id="vars"></table></div>
+    <div><p class="muted label">Вывод</p><pre class="console mono" id="console" aria-live="polite"></pre></div>
+  </div>
+</div>
+<p class="caption" id="caption"></p>
+
+<script type="module">
+import { DEFAULTS, PROGRAMS, code, parseItems, trace } from "./logic.js";
+import { el, presets, slider, stepPlayer, ready } from "../../kit/ui.js";
+
+const TITLES = { if: "if / elif / else", while: "while", break: "for + break", continue: "for + continue" };
+const state = {
+  name: "break",
+  params: JSON.parse(JSON.stringify(DEFAULTS)),
+  run: null,      // результат trace() или null при ошибке ввода
+  pos: -1,        // -1 - программа не начата, events.length - завершилась
+  error: "",
+};
+const $ = (id) => document.getElementById(id);
+
+function rebuild() {
+  player.stop();
+  state.run = state.error ? null : trace(state.name, state.params[state.name]);
+  state.pos = -1;
+  render();
+}
+
+function buildParams() {
+  const box = $("params");
+  box.replaceChildren();
+  state.error = "";
+  const p = state.params[state.name];
+  if (state.name === "if" || state.name === "while") {
+    const holder = el("div", { class: "slider-holder" });
+    box.append(holder);
+    const [key, label, min, max] = state.name === "if" ? ["temp", "temp", -10, 20] : ["limit", "граница в while x < …", 1, 6];
+    slider(holder, { label, min, max, step: 1, value: p[key], onInput: (v) => { p[key] = v; rebuild(); } });
+  } else {
+    const field = el("input", { class: "field mono", type: "text", value: p.items.join(", "), "aria-label": "Список для цикла for",
+      autocomplete: "off", spellcheck: "false",
+      oninput: (e) => {
+        const parsed = parseItems(e.target.value);
+        state.error = parsed.ok ? "" : `Список: ${parsed.error}`;
+        field.classList.toggle("is-invalid", !parsed.ok);
+        if (parsed.ok) p.items = parsed.items;
+        rebuild();
+      } });
+    box.append(el("span", { class: "muted" }, "список:"), field);
+  }
+}
+
+function render() {
+  const run = state.run;
+  const lines = code(state.name, state.params[state.name]);
+  const finished = run && state.pos >= run.events.length;
+  const event = run && state.pos >= 0 && !finished ? run.events[state.pos] : null;
+  $("code").replaceChildren(...lines.map((text, i) => el("li", { class: event && event.line === i + 1 ? "is-now" : "" }, text)));
+  const vars = !run || state.pos < 0 ? {} : finished ? run.vars : event.vars;
+  $("vars").replaceChildren(...(Object.keys(vars).length
+    ? Object.entries(vars).map(([k, v]) => el("tr", {}, el("td", {}, k), el("td", {}, v)))
+    : [el("tr", {}, el("td", { class: "muted" }, "пока нет"))]));
+  $("console").textContent = !run || state.pos < 0 ? "" : finished ? run.output : event.out;
+  $("step").disabled = !run || finished;
+  $("counter").textContent = !run ? "" : finished ? "программа завершилась" : `шаг ${Math.max(state.pos + 1, 0)} из ${run.events.length}`;
+  const caption = $("caption");
+  caption.className = state.error ? "error" : "caption";
+  caption.textContent = state.error
+    || (finished ? "Программа завершилась." : event ? `Строка ${event.line}: ${lines[event.line - 1].trim()}` : "Нажмите «шаг»: подсветится строка, которая выполнится первой.");
+}
+
+let playFrom = -1;
+const player = stepPlayer($("play"), {
+  steps: () => {
+    if (!state.run || state.pos >= state.run.events.length) return [];
+    playFrom = state.pos;
+    return Array.from({ length: state.run.events.length - state.pos }, (_, i) => String(i));
+  },
+  onStep(i) {
+    if (i >= 0) state.pos = Math.min(playFrom + 1 + i, state.run.events.length);
+    render();
+  },
+  interval: 700,
+});
+
+$("step").addEventListener("click", () => {
+  player.stop();
+  if (state.run && state.pos < state.run.events.length) state.pos += 1;
+  render();
+});
+$("reset").addEventListener("click", () => { player.stop(); state.pos = -1; render(); });
+
+const programBar = presets($("programs"), PROGRAMS.map((name) => ({ label: TITLES[name], value: name })), (name) => {
+  player.stop();   // до смены программы: иначе остановка перерисует старую трассу поверх нового кода
+  state.name = name;
+  buildParams();
+  rebuild();
+});
+programBar.setActive(PROGRAMS.indexOf(state.name));
+
+buildParams();
+rebuild();
+ready();
+</script>
+</body>
+</html>

@@ -16,8 +16,14 @@
 - [Softmax и температура](https://petrovyuri.github.io/llm-stepik-interactive/m02/softmax-temperature/) - урок «softmax и temperature»
 - [Градиентный спуск](https://petrovyuri.github.io/llm-stepik-interactive/m02/gradient-descent/) - урок «Производная (очень упрощённо)»
 
+Модуль 3 «Мини-курс Python»:
+
+- [Цикл по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m03/loop-trace/) - урок «Условия и циклы»
+- [От строки к токенам](https://petrovyuri.github.io/llm-stepik-interactive/m03/text-to-tokens/) - урок «Функции»
+- [Autograd: y = w · x](https://petrovyuri.github.io/llm-stepik-interactive/m03/autograd/) - урок «PyTorch самое нужное»
+
 ## Как это устроено
 
 Обычные HTML-страницы без сборки и сторонних библиотек, опубликованные через GitHub Pages. В `kit/` лежат общие стили и компоненты, в `mNN/<демо>/` - страница демо и файл `logic.js` с её вычислениями.
 
-Здесь только готовые страницы. Исходники, тесты и эталонные расчёты на PyTorch, с которыми сверяются числа в демо, лежат в рабочем репозитории автора курса.
+Здесь только готовые страницы. Исходники, тесты и эталонные расчёты на Python и PyTorch, с которыми сверяются числа в демо, лежат в рабочем репозитории автора курса.

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>От строки к токенам</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.field { width: 100%; padding: 8px 10px; font-size: 15px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+.pipe { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.stage { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: baseline; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.stage.is-off { opacity: .45; }
+.stage.is-now { border-color: var(--orange); }
+.stage label { display: flex; gap: 6px; align-items: center; white-space: nowrap; cursor: pointer; }
+.val, #caption { white-space: pre-wrap; overflow-wrap: anywhere; }   /* пробелы подряд не схлопываются, как в repr */
+.sp { background: rgba(251, 191, 36, .3); border-radius: 2px; }
+.out { margin: 4px 0 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 520px) { .stage { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 3 · урок «Функции»</p>
+<h1>Как строка превращается в токены</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row row--spread">
+    <div class="row" id="presets"></div>
+    <button type="button" class="btn-play" id="play">▶ по шагам</button>
+  </div>
+  <div class="row--top">
+    <input class="field mono" id="text" type="text" maxlength="80" autocomplete="off" spellcheck="false" aria-label="Строка">
+  </div>
+</div>
+
+<div class="panel">
+  <ol class="pipe mono" id="pipe"></ol>
+  <p class="caption" id="caption"></p>
+  <p class="readout muted">print(s)</p>
+  <pre class="out mono" id="out" aria-live="polite"></pre>
+</div>
+
+<script type="module">
+import { STEPS, captions, pipeline, printed, reprStr } from "./logic.js";
+import { el, presets, stepPlayer, ready } from "../../kit/ui.js";
+
+const HINT = "Подсвеченные клетки - пробелы. Шаги можно выключать галочками.";
+const CODE = { strip: "s = s.strip()", lower: "s = s.lower()", replace: 's = s.replace("!", "")', split: "s = s.split()" };
+const PRESETS = [
+  { label: "simple_tokenize из урока", value: { text: "  Я люблю LLM  ", flags: { strip: true, lower: true, replace: false, split: true } } },
+  { label: "clean_text из урока", value: { text: "  Привет!!!  ", flags: { strip: true, lower: true, replace: true, split: false } } },
+  { label: "без lower", value: { text: "  Я люблю LLM  ", flags: { strip: true, lower: false, replace: false, split: true } } },
+  { label: "лишние пробелы внутри", value: { text: "я   люблю\tLLM", flags: { strip: true, lower: true, replace: false, split: true } } },
+];
+
+const state = { text: PRESETS[0].value.text, flags: { ...PRESETS[0].value.flags } };
+const input = document.getElementById("text");
+const caption = document.getElementById("caption");
+const out = document.getElementById("out");
+input.value = state.text;
+
+/** Строка в записи Python, пробелы внутри неё подсвечены. */
+function strNode(s) {
+  const node = el("span");
+  for (const ch of reprStr(s)) node.append(ch === " " ? el("span", { class: "sp" }, " ") : ch);
+  return node;
+}
+
+function valueNodes(value) {
+  if (!Array.isArray(value)) return [strNode(value)];
+  const nodes = ["["];
+  value.forEach((item, i) => { if (i) nodes.push(", "); nodes.push(strNode(item)); });
+  nodes.push("]");
+  return nodes;
+}
+
+function changed() {
+  player.stop();
+  presetBar.setActive(null);
+  render();
+}
+
+const rows = STEPS.map((step) => {
+  const box = el("input", { type: "checkbox", "aria-label": `Шаг ${CODE[step]}`,
+    onchange: (e) => { state.flags[step] = e.target.checked; changed(); } });
+  const value = el("span", { class: "val" });
+  const li = el("li", { class: "stage" }, el("label", {}, box, el("code", {}, CODE[step])), value);
+  document.getElementById("pipe").append(li);
+  return { step, li, box, value };
+});
+
+/** active - номер включённого шага, который подсвечивает «▶ по шагам»; -1 - обычный вид. */
+function render(active = -1) {
+  const { stages } = pipeline(state.text, state.flags);
+  let k = 0;
+  for (const row of rows) {
+    const on = Boolean(state.flags[row.step]);
+    row.box.checked = on;
+    row.li.classList.toggle("is-off", !on);
+    row.li.classList.toggle("is-now", on && k === active);
+    row.value.replaceChildren(...(on ? valueNodes(stages[k].value) : ["шаг выключен"]));
+    if (on) k += 1;
+  }
+  out.textContent = printed(state.text, state.flags);
+}
+
+input.addEventListener("input", () => { state.text = input.value; changed(); });
+
+const player = stepPlayer(document.getElementById("play"), {
+  steps: () => captions(state.text, state.flags),
+  onStep(i, text) {
+    caption.textContent = text ?? HINT;
+    render(i);
+  },
+});
+
+const presetBar = presets(document.getElementById("presets"), PRESETS, (value) => {
+  player.stop();
+  state.text = value.text;
+  state.flags = { ...value.flags };
+  input.value = state.text;
+  render();
+});
+presetBar.setActive(0);
+
+caption.textContent = HINT;
+render();
+ready();
+</script>
+</body>
+</html>
