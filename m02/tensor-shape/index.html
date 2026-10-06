@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Форма тензора</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+:root { --cell: 24px; }
+.matrix { gap: 3px; }
+.matrix__cell { height: 22px; font-size: 12px; border-radius: 4px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.tab[aria-selected="true"] { border-color: var(--cyan); color: var(--cyan); }
+.shape-view { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.stack { position: relative; flex: none; }
+.page { position: absolute; left: 0; top: 0; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.page:not(:last-child) { opacity: .5; }
+.info { flex: 1 1 300px; min-width: 0; display: grid; gap: 6px; }
+.ranks { border-collapse: collapse; font-size: 12.5px; }
+.ranks td { padding: 3px 6px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.ranks tr.is-current td { color: var(--cyan); }
+.appear .matrix__cell { animation: appear .3s both; }
+@keyframes appear { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 2 · урок 1</p>
+<h1>Тензор - числа в коробке определённой формы</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="tabs" role="tablist">
+  <button type="button" class="tab" role="tab" id="tab-shape" aria-selected="true" aria-controls="panel-shape">Форма</button>
+  <button type="button" class="tab" role="tab" id="tab-reshape" aria-selected="false" aria-controls="panel-reshape">Reshape</button>
+</div>
+
+<section id="panel-shape" role="tabpanel" aria-labelledby="tab-shape">
+  <div class="panel">
+    <div class="row" id="ranks-bar"></div>
+    <div class="row row--top" id="sliders"></div>
+  </div>
+  <div class="panel shape-view">
+    <div class="stack" id="stack"></div>
+    <div class="info">
+      <p class="readout" id="shape-text" aria-live="polite"></p>
+      <table class="ranks" id="ranks"></table>
+    </div>
+  </div>
+</section>
+
+<section id="panel-reshape" role="tabpanel" aria-labelledby="tab-reshape" hidden>
+  <div class="panel">
+    <p class="readout">x = <span id="src-text"></span>, форма (2, 3)</p>
+    <div id="src-grid" class="row--top"></div>
+    <p class="readout muted row--top">читаем по строкам: <span id="flat"></span></p>
+    <div class="row row--top" id="targets"></div>
+  </div>
+  <div class="panel">
+    <p class="readout" id="code" aria-live="polite"></p>
+    <div id="dst-grid" class="row--top"></div>
+    <p class="error" id="error"></p>
+  </div>
+</section>
+
+<script type="module">
+import { flatten, makeTensor, numel, RANKS, reshape, shapeStr, torchSize } from "./logic.js";
+import { listStr } from "../../kit/format.js";
+import { el, matrixView, presets, slider, ready } from "../../kit/ui.js";
+
+// ---------- вкладки ----------
+const TABS = [["tab-shape", "panel-shape"], ["tab-reshape", "panel-reshape"]];
+for (const [tabId] of TABS) {
+  document.getElementById(tabId).addEventListener("click", () => {
+    for (const [tab, panel] of TABS) {
+      document.getElementById(tab).setAttribute("aria-selected", String(tab === tabId));
+      document.getElementById(panel).hidden = tab !== tabId;
+    }
+    if (tabId === "tab-shape") renderShape();
+  });
+}
+
+// ---------- форма ----------
+const LIMITS = { batch: 4, seq: 6, d: 8 };
+const AXES = { 0: [], 1: ["d"], 2: ["seq", "d"], 3: ["batch", "seq", "d"] };
+const OFFSET = 18;   // сдвиг страниц в стопке
+const dims = { batch: 2, seq: 2, d: 2 };
+let rank = 3;
+
+const holders = {};
+for (const axis of ["batch", "seq", "d"]) {
+  holders[axis] = el("div", { class: "slider-holder" });
+  document.getElementById("sliders").append(holders[axis]);
+  slider(holders[axis], {
+    label: axis, min: 1, max: LIMITS[axis], step: 1, value: dims[axis],
+    onInput: (v) => { dims[axis] = v; renderShape(); },
+  });
+}
+
+const rankBar = presets(document.getElementById("ranks-bar"),
+  RANKS.map((r) => ({ label: `${r.rank}D ${r.name.toLowerCase()}`, value: r.rank })),
+  (value) => { rank = value; renderShape(); });
+rankBar.setActive(3);
+
+const ranksTable = document.getElementById("ranks");
+ranksTable.append(...RANKS.map((r) => el("tr", { "data-rank": r.rank },
+  el("td", {}, `${r.rank}D`), el("td", {}, r.name), el("td", { class: "mono" }, r.shape), el("td", {}, r.example))));
+
+function renderShape() {
+  const shape = AXES[rank].map((axis) => dims[axis]);
+  for (const axis of ["batch", "seq", "d"]) holders[axis].hidden = !AXES[rank].includes(axis);
+  const tensor = makeTensor(shape);
+  // Всё рисуем стопкой страниц: у 0D-2D страница одна.
+  const pages = rank === 3 ? tensor : [rank === 2 ? tensor : rank === 1 ? [tensor] : [[tensor]]];
+  const stack = document.getElementById("stack");
+  stack.replaceChildren();
+  for (let k = pages.length - 1; k >= 0; k -= 1) {   // передняя страница (k = 0) - последней, сверху
+    const page = el("div", { class: "page", style: `transform: translate(${k * OFFSET}px, ${k * OFFSET}px)` });
+    stack.append(page);
+    matrixView(page, pages[k], { label: `страница ${k + 1}` });
+  }
+  const front = stack.lastElementChild;
+  stack.style.width = `${front.offsetWidth + (pages.length - 1) * OFFSET}px`;
+  stack.style.height = `${front.offsetHeight + (pages.length - 1) * OFFSET}px`;
+  document.getElementById("shape-text").textContent =
+    `форма ${shapeStr(shape)} · ${torchSize(shape)} · элементов: ${numel(shape)}`;
+  for (const row of ranksTable.rows) row.classList.toggle("is-current", Number(row.dataset.rank) === rank);
+}
+
+// ---------- reshape ----------
+const SOURCE = [[1, 2, 3], [4, 5, 6]];
+const FLAT = flatten(SOURCE);
+const TARGETS = [[6], [3, 2], [1, 6], [6, 1], [2, 3], [4, 2], [5]];
+matrixView(document.getElementById("src-grid"), SOURCE, { label: "x" });
+document.getElementById("src-text").textContent = listStr(SOURCE);
+document.getElementById("flat").textContent = FLAT.join(" ");
+
+const dst = document.getElementById("dst-grid");
+const code = document.getElementById("code");
+const error = document.getElementById("error");
+
+function renderReshape(shape) {
+  const result = reshape(FLAT, shape);
+  const call = `x.reshape(${shape.join(", ")})`;
+  if (!result.ok) {
+    dst.replaceChildren();
+    code.textContent = call;
+    error.textContent = `RuntimeError: ${result.error}. В x ${FLAT.length} элементов, а форме ${shapeStr(shape)} нужно ${numel(shape)}.`;
+    return;
+  }
+  error.textContent = "";
+  code.textContent = `${call} → ${listStr(result.value)}`;
+  dst.classList.remove("appear");
+  void dst.offsetWidth;   // перезапуск анимации появления
+  dst.classList.add("appear");
+  matrixView(dst, shape.length === 1 ? [result.value] : result.value, { label: call });
+  dst.querySelectorAll(".matrix__cell").forEach((cell, k) => { cell.style.animationDelay = `${k * 70}ms`; });
+}
+
+const targetBar = presets(document.getElementById("targets"),
+  TARGETS.map((shape) => ({ label: shapeStr(shape), value: shape })),
+  (shape) => renderReshape(shape));
+targetBar.setActive(1);
+renderReshape([3, 2]);
+
+renderShape();
+ready();
+</script>
+</body>
+</html>
