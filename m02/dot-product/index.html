@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Скалярное произведение</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.plane-wrap { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+#plane { width: 320px; max-width: 100%; height: auto; touch-action: none; user-select: none; }
+.side { flex: 1 1 220px; min-width: 0; display: grid; gap: 6px; }
+.vec-a { color: var(--cyan); font-weight: 600; }
+.vec-b { color: var(--purple); font-weight: 600; }
+.handle { cursor: grab; outline: none; }
+.handle:focus-visible .ring { stroke: var(--yellow); stroke-width: 3; }
+.hint { margin: 0; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 2 · урок 1</p>
+<h1>Когда скалярное произведение большое, а когда отрицательное</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel row row--spread">
+  <div class="row" id="presets"></div>
+  <button type="button" class="btn-play" id="play">▶ по шагам</button>
+</div>
+
+<div class="panel plane-wrap">
+  <svg id="plane" viewBox="0 0 400 400" aria-label="Плоскость с векторами A и B"></svg>
+  <div class="side">
+    <p class="readout"><span class="vec-a">A</span> = <span id="a-val"></span>, <span class="vec-b">B</span> = <span id="b-val"></span></p>
+    <p class="readout" id="formula" aria-live="polite"></p>
+    <p class="verdict" id="verdict"></p>
+    <p class="caption" id="caption"></p>
+    <p class="muted hint">Тяните концы стрелок. Или выберите стрелку клавишей Tab и двигайте её стрелками на клавиатуре.</p>
+  </div>
+</div>
+
+<script type="module">
+import { steps, verdict, display } from "./logic.js";
+import { num } from "../../kit/format.js";
+import { svg, presets, stepPlayer, ready } from "../../kit/ui.js";
+
+const LIMIT = 5;          // координаты от -5 до 5
+const SNAP = 0.5;         // шаг перетаскивания
+const UNIT = 36;          // пикселей на единицу
+const CENTER = 200;
+const px = (x) => CENTER + x * UNIT;
+const py = (y) => CENTER - y * UNIT;
+const coords = (v) => `(${v.map((x) => num(x)).join(", ")})`;
+
+const PRESETS = [
+  { label: "(1, 2) · (3, 4) из урока", value: { a: [1, 2], b: [3, 4] } },
+  { label: "под прямым углом", value: { a: [2, 1], b: [-1, 2] } },
+  { label: "в разные стороны", value: { a: [2, 1], b: [-2, -1] } },
+];
+const VERDICT = {
+  same: { text: "больше 0: векторы смотрят в одну сторону", cls: "good" },
+  orthogonal: { text: "равно 0: векторы перпендикулярны", cls: "muted" },
+  opposite: { text: "меньше 0: векторы смотрят в разные стороны", cls: "bad" },
+  zero: { text: "равно 0: один из векторов нулевой", cls: "muted" },
+};
+
+const state = { a: [...PRESETS[0].value.a], b: [...PRESETS[0].value.b] };
+const plane = document.getElementById("plane");
+const caption = document.getElementById("caption");
+const verdictEl = document.getElementById("verdict");
+
+function label(text, attrs) {
+  const node = svg("text", { fill: "var(--muted)", "font-size": 13, ...attrs });
+  node.textContent = text;
+  return node;
+}
+
+// ---------- сетка, оси, наконечники стрелок ----------
+const defs = svg("defs");
+for (const [id, color] of [["head-a", "var(--cyan)"], ["head-b", "var(--purple)"]]) {
+  const marker = svg("marker", { id, viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
+  marker.append(svg("path", { d: "M0,0 L10,5 L0,10 z", fill: color }));
+  defs.append(marker);
+}
+plane.append(defs);
+for (let k = -LIMIT; k <= LIMIT; k += 1) {
+  const axis = k === 0;
+  const stroke = axis ? "var(--muted)" : "var(--line)";
+  const width = axis ? 1.5 : 1;
+  plane.append(svg("line", { x1: px(k), y1: py(-LIMIT), x2: px(k), y2: py(LIMIT), stroke, "stroke-width": width }));
+  plane.append(svg("line", { x1: px(-LIMIT), y1: py(k), x2: px(LIMIT), y2: py(k), stroke, "stroke-width": width }));
+}
+plane.append(label("x", { x: px(LIMIT) - 4, y: py(0) - 6, "text-anchor": "end" }), label("y", { x: px(0) + 6, y: py(LIMIT) + 14 }));
+
+// Проекции на ось - их рисует «▶ по шагам».
+const proj = svg("g");
+plane.append(proj);
+
+function drawProjection(axis) {
+  proj.replaceChildren();
+  if (axis === null) return;
+  for (const [key, color, offset] of [["a", "var(--cyan)", -6], ["b", "var(--purple)", 6]]) {
+    const v = state[key][axis];
+    const attrs = axis === 0
+      ? { x1: px(0), y1: py(0) + offset, x2: px(v), y2: py(0) + offset }
+      : { x1: px(0) + offset, y1: py(0), x2: px(0) + offset, y2: py(v) };
+    proj.append(svg("line", { ...attrs, stroke: color, "stroke-width": 6, "stroke-linecap": "round", opacity: 0.85 }));
+  }
+}
+
+// ---------- векторы ----------
+function makeVector(key, color, head) {
+  const name = key.toUpperCase();
+  const line = svg("line", { x1: px(0), y1: py(0), stroke: color, "stroke-width": 3.5, "marker-end": `url(#${head})` });
+  const handle = svg("g", { class: "handle", tabindex: 0 });
+  const ring = svg("circle", { class: "ring", r: 11, fill: "transparent", stroke: color, "stroke-width": 2 });
+  const tag = svg("text", { fill: color, "font-size": 15, "font-weight": 700 });
+  tag.textContent = name;
+  handle.append(ring);
+  plane.append(line, handle, tag);
+
+  function move(x, y) {
+    const clamp = (v) => Math.max(-LIMIT, Math.min(LIMIT, Math.round(v / SNAP) * SNAP));
+    state[key] = [clamp(x), clamp(y)];
+    player.stop();
+    presetBar.setActive(null);
+    render();
+  }
+
+  handle.addEventListener("pointerdown", (e) => {
+    handle.setPointerCapture(e.pointerId);
+    handle.focus();
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!handle.hasPointerCapture(e.pointerId)) return;
+    const point = plane.createSVGPoint();
+    point.x = e.clientX;
+    point.y = e.clientY;
+    const p = point.matrixTransform(plane.getScreenCTM().inverse());
+    move((p.x - CENTER) / UNIT, (CENTER - p.y) / UNIT);
+  });
+  handle.addEventListener("keydown", (e) => {
+    const delta = { ArrowLeft: [-SNAP, 0], ArrowRight: [SNAP, 0], ArrowUp: [0, SNAP], ArrowDown: [0, -SNAP] }[e.key];
+    if (!delta) return;
+    e.preventDefault();
+    move(state[key][0] + delta[0], state[key][1] + delta[1]);
+  });
+
+  return {
+    draw() {
+      const [x, y] = state[key];
+      line.setAttribute("x2", px(x));
+      line.setAttribute("y2", py(y));
+      ring.setAttribute("cx", px(x));
+      ring.setAttribute("cy", py(y));
+      tag.setAttribute("x", px(x) + (x >= 0 ? 12 : -24));
+      tag.setAttribute("y", py(y) + (y >= 0 ? -10 : 22));
+      handle.setAttribute("aria-label", `Конец вектора ${name}: ${coords(state[key])}`);
+    },
+  };
+}
+
+const vectors = [makeVector("a", "var(--cyan)", "head-a"), makeVector("b", "var(--purple)", "head-b")];
+
+function render() {
+  vectors.forEach((v) => v.draw());
+  document.getElementById("a-val").textContent = coords(state.a);
+  document.getElementById("b-val").textContent = coords(state.b);
+  document.getElementById("formula").textContent = `A · B = ${display.dot(state.a, state.b)}`;
+  const v = VERDICT[verdict(state.a, state.b)];
+  verdictEl.textContent = `A · B ${v.text}`;
+  verdictEl.className = `verdict ${v.cls}`;
+}
+
+const player = stepPlayer(document.getElementById("play"), {
+  steps: () => steps(state.a, state.b),
+  onStep(i, text) {
+    caption.textContent = text ?? "";
+    drawProjection(i === 0 || i === 1 ? i : null);
+  },
+});
+
+const presetBar = presets(document.getElementById("presets"), PRESETS, (value) => {
+  player.stop();
+  state.a = [...value.a];
+  state.b = [...value.b];
+  render();
+});
+presetBar.setActive(0);
+
+render();
+ready();
+</script>
+</body>
+</html>
