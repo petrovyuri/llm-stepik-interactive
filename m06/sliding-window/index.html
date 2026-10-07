@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Скользящее окно</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.strip { display: flex; flex-wrap: wrap; gap: 3px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.strip li { padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+.strip li.is-x { border-color: var(--cyan); background: rgba(34, 211, 238, .16); }
+.strip li.is-y { box-shadow: inset 0 -3px var(--purple); }
+.strip li.is-skip { color: var(--muted); border-style: dashed; opacity: .6; }
+.strip li.is-ws { color: var(--muted); }
+.xy { margin: 10px 0 0; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.xy .x { color: var(--cyan); }
+.xy .y { color: var(--purple); }
+.formula { margin: 6px 0 0; font-size: 13px; }
+.lines { margin: 0; font-size: 12px; line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; }   /* 19 строк при window_context = 8 */
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 6 · урок «Класс Dataset»</p>
+<h1>Как скользящее окно режет текст на примеры</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row row--spread">
+    <div class="row" id="tabs"></div>
+    <button type="button" class="btn-play" id="play">▶ по шагам</button>
+  </div>
+  <div id="window-tools">
+    <div class="row row--top">
+      <div class="slider-holder" id="len"></div>
+      <div class="slider-holder" id="stride"></div>
+    </div>
+    <div class="row row--top">
+      <button type="button" id="prev">← пример</button>
+      <button type="button" id="next">пример →</button>
+      <span class="muted" id="counter"></span>
+    </div>
+  </div>
+  <div id="growing-tools" hidden>
+    <div class="row row--top"><div class="slider-holder" id="ctx"></div></div>
+  </div>
+</div>
+
+<div class="panel" id="window-view">
+  <ol class="strip mono" id="strip" aria-label="Токены cat_story.txt"></ol>
+  <div class="xy mono" id="xy"></div>
+  <p class="muted formula mono" id="formula"></p>
+</div>
+<div class="panel" id="growing-view" hidden>
+  <pre class="lines mono" id="lines"></pre>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+
+<script type="module">
+import { IDS, MAX_CONTEXT, MAX_LEN, MAX_STRIDE, PIECES, formula, growingLines, item, length, skipped } from "./logic.js";
+import { reprStr } from "../../kit/py.js";
+import { el, presets, slider, stepPlayer, ready } from "../../kit/ui.js";
+
+const state = { tab: "window", L: 4, s: 1, idx: 0, ctx: 3 };
+const $ = (id) => document.getElementById(id);
+const label = (piece) => (piece === " " ? "␣" : piece === "\n" ? "↵" : piece.trim());
+const chips = IDS.map((id, i) => {
+  const li = el("li", { title: `${i}: ${id}`, class: PIECES[i].trim() ? "" : "is-ws" }, label(PIECES[i]));
+  $("strip").append(li);
+  return li;
+});
+
+function render() {
+  const windowTab = state.tab === "window";
+  $("window-tools").hidden = !windowTab;
+  $("window-view").hidden = !windowTab;
+  $("growing-tools").hidden = windowTab;
+  $("growing-view").hidden = windowTab;
+  $("play").hidden = !windowTab;
+  if (!windowTab) {
+    $("lines").textContent = growingLines(state.ctx).join("\n");
+    $("caption").textContent = "С каждым шагом контекст растёт на один токен - так выглядит авторегрессия.";
+    return;
+  }
+  const n = length(state.L, state.s);
+  const it = item(state.L, state.s, state.idx);
+  const skip = new Set(skipped(state.L, state.s));
+  chips.forEach((li, i) => {
+    li.classList.toggle("is-x", i >= it.start && i < it.start + state.L);
+    li.classList.toggle("is-y", i > it.start && i <= it.start + state.L);
+    li.classList.toggle("is-skip", skip.has(i));
+  });
+  $("xy").replaceChildren(
+    `x, y = dataset[${state.idx}]\n`,
+    el("span", { class: "x" }, `X: [${it.x.join(", ")}]  ${reprStr(it.xText)}`), "\n",
+    el("span", { class: "y" }, `Y: [${it.y.join(", ")}]  ${reprStr(it.yText)}`),
+  );
+  $("formula").textContent = formula(state.L, state.s);
+  $("counter").textContent = `пример ${state.idx + 1} из ${n}`;
+  $("prev").disabled = state.idx === 0;
+  $("next").disabled = state.idx >= n - 1;
+  const base = state.s > state.L
+    ? `Шаг ${state.s} больше окна ${state.L}: часть токенов между окнами пропущена.`
+    : state.s === state.L
+      ? "Шаг равен окну: примеры идут встык, без перекрытия."
+      : `Шаг ${state.s} меньше окна ${state.L}: соседние примеры перекрываются.`;
+  $("caption").textContent = skip.size ? `${base} Серые токены не попадают ни в X, ни в Y.` : base;
+}
+
+let playFrom = 0;
+const player = stepPlayer($("play"), {
+  steps: () => {
+    const n = length(state.L, state.s);
+    if (state.idx >= n - 1) return [];
+    playFrom = state.idx;
+    return Array.from({ length: n - 1 - state.idx }, (_, i) => String(i));
+  },
+  onStep(i) {
+    if (i >= 0) state.idx = playFrom + 1 + i;
+    render();
+  },
+  interval: 600,
+});
+
+/** Любое изменение данных: сначала остановить проигрывание. */
+function change(update) {
+  player.stop();
+  update();
+  render();
+}
+
+slider($("len"), { label: "max_length", min: 1, max: MAX_LEN, step: 1, value: state.L,
+  onInput: (v) => change(() => { state.L = v; state.idx = 0; }) });
+slider($("stride"), { label: "stride", min: 1, max: MAX_STRIDE, step: 1, value: state.s,
+  onInput: (v) => change(() => { state.s = v; state.idx = 0; }) });
+slider($("ctx"), { label: "window_context", min: 1, max: MAX_CONTEXT, step: 1, value: state.ctx,
+  onInput: (v) => change(() => { state.ctx = v; }) });
+$("prev").addEventListener("click", () => change(() => { state.idx = Math.max(0, state.idx - 1); }));
+$("next").addEventListener("click", () => change(() => { state.idx = Math.min(length(state.L, state.s) - 1, state.idx + 1); }));
+
+const tabs = presets($("tabs"), [{ label: "окно", value: "window" }, { label: "растущий контекст", value: "growing" }],
+  (tab) => change(() => { state.tab = tab; }));
+tabs.setActive(0);
+
+render();
+ready();
+</script>
+</body>
+</html>

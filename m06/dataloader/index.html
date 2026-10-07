@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DataLoader: пакеты</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.check { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.out { margin: 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; }   /* 6 токенов × 4 строки */
+.summary { margin: 8px 0 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 6 · урок «DataLoader»</p>
+<h1>Как DataLoader складывает примеры в пакеты</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row" id="presets"></div>
+  <div class="row row--top">
+    <div class="slider-holder" id="len"></div>
+    <div class="slider-holder" id="stride"></div>
+    <div class="slider-holder" id="batch"></div>
+  </div>
+  <div class="row row--top">
+    <label class="check"><input type="checkbox" id="drop"><code>drop_last=True</code></label>
+    <button type="button" id="prev">← пакет</button>
+    <button type="button" id="next">пакет →</button>
+    <button type="button" class="btn-play" id="play">▶ по шагам</button>
+    <span class="muted" id="counter"></span>
+  </div>
+</div>
+
+<div class="panel">
+  <pre class="out mono" id="out" aria-live="polite"></pre>
+  <p class="summary" id="summary"></p>
+</div>
+
+<script type="module">
+import { MAX_BATCH, MAX_LEN, MAX_STRIDE, batchText, count, summary } from "./logic.js";
+import { presets, slider, stepPlayer, ready } from "../../kit/ui.js";
+
+const PRESETS = [
+  { label: "урок 4", value: { L: 4, s: 1, b: 2, drop: false } },
+  { label: "урок 5: drop_last", value: { L: 4, s: 1, b: 2, drop: true } },
+  { label: "без перекрытия", value: { L: 4, s: 4, b: 2, drop: false } },
+  { label: "неполный пакет", value: { L: 4, s: 3, b: 4, drop: false } },
+];
+const state = { L: 4, s: 1, b: 2, drop: false, k: 0 };
+const $ = (id) => document.getElementById(id);
+
+function render() {
+  const n = count(state.L, state.s, state.b, state.drop);
+  state.k = Math.min(state.k, n - 1);
+  $("out").textContent = batchText(state.L, state.s, state.b, state.drop, state.k);
+  $("summary").textContent = summary(state.L, state.s, state.b, state.drop);
+  $("counter").textContent = `пакет ${state.k + 1} из ${n}`;
+  $("prev").disabled = state.k === 0;
+  $("next").disabled = state.k >= n - 1;
+  $("drop").checked = state.drop;
+}
+
+let playFrom = 0;
+const player = stepPlayer($("play"), {
+  steps: () => {
+    const n = count(state.L, state.s, state.b, state.drop);
+    if (state.k >= n - 1) return [];
+    playFrom = state.k;
+    return Array.from({ length: n - 1 - state.k }, (_, i) => String(i));
+  },
+  onStep(i) {
+    if (i >= 0) state.k = playFrom + 1 + i;
+    render();
+  },
+  interval: 700,
+});
+
+/** Любое изменение данных: сначала остановить проигрывание, потом менять. */
+function change(update, keepPreset = false) {
+  player.stop();
+  update();
+  if (!keepPreset) presetBar.setActive(null);
+  render();
+}
+
+const sliders = {
+  L: slider($("len"), { label: "max_length", min: 1, max: MAX_LEN, step: 1, value: state.L,
+    onInput: (v) => change(() => { state.L = v; state.k = 0; }) }),
+  s: slider($("stride"), { label: "stride", min: 1, max: MAX_STRIDE, step: 1, value: state.s,
+    onInput: (v) => change(() => { state.s = v; state.k = 0; }) }),
+  b: slider($("batch"), { label: "batch_size", min: 1, max: MAX_BATCH, step: 1, value: state.b,
+    onInput: (v) => change(() => { state.b = v; state.k = 0; }) }),
+};
+$("drop").addEventListener("change", (e) => change(() => { state.drop = e.target.checked; state.k = 0; }));
+$("prev").addEventListener("click", () => change(() => { state.k = Math.max(0, state.k - 1); }, true));
+$("next").addEventListener("click", () => change(() => { state.k += 1; }, true));
+
+const presetBar = presets($("presets"), PRESETS, (value) => change(() => {
+  Object.assign(state, value, { k: 0 });
+  sliders.L.set(value.L);
+  sliders.s.set(value.s);
+  sliders.b.set(value.b);
+}, true));
+presetBar.setActive(0);
+
+render();
+ready();
+</script>
+</body>
+</html>
