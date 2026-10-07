@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>От ID к вектору</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.table { width: 100%; border-collapse: separate; border-spacing: 2px; table-layout: fixed; margin-top: 6px; }
+.table th { width: 52px; padding-right: 6px; font-size: 12px; font-weight: 400; color: var(--muted); text-align: right; }
+.table td { height: 22px; border-radius: 3px; }
+.table tr.is-pick th { color: var(--cyan); font-weight: 600; }
+.table tr.is-pick td { outline: 2px solid var(--cyan); outline-offset: -1px; }
+.values { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
+.values li { display: flex; justify-content: space-between; gap: 4px; padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; }
+.values small { color: var(--muted); }
+.shapes { margin: 8px 0 0; font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note { margin: 6px 0 0; font-size: 12.5px; }
+@media (max-width: 520px) {
+  .values { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .table th { width: 44px; }
+}
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 7 · урок «Векторные представления»</p>
+<h1>Как слой эмбеддингов превращает ID в вектор</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel"><div class="row" id="tokens"></div></div>
+<div class="panel">
+  <p class="readout" id="row-title"></p>
+  <table class="table" id="table" aria-label="Кусок таблицы token_embedding: пять строк по 16 чисел"></table>
+  <ol class="values mono" id="values" aria-label="Числа выбранной строки"></ol>
+  <p class="shapes mono" id="shapes"></p>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+<p class="muted note">Числа случайные (seed 42): слой ещё не обучен, у вас будут другие. Чтобы получить такие же, поставьте <code>torch.manual_seed(42)</code> перед созданием слоя.</p>
+
+<script type="module">
+import { EMBED_DIM, VOCAB, around, cells, shape, tokens } from "./logic.js";
+import { el, presets, ready } from "../../kit/ui.js";
+
+const TOKENS = tokens();
+const LIMIT = 0.05;   // |v| = 0.05 - самая яркая клетка (std слоя - 0.02)
+const $ = (id) => document.getElementById(id);
+const label = (piece) => piece.replace(/^ /, "␣");
+const state = { id: TOKENS[1].id };
+
+/** Голубой - минус, оранжевый - плюс, яркость - величина числа. */
+function heat(v) {
+  const alpha = (0.15 + 0.75 * Math.min(1, Math.abs(v) / LIMIT)).toFixed(2);
+  return v < 0 ? `rgba(34, 211, 238, ${alpha})` : `rgba(249, 115, 22, ${alpha})`;
+}
+
+function render() {
+  const { ids, rows } = around(state.id);
+  const piece = TOKENS.find((t) => t.id === state.id).piece;
+  $("row-title").textContent = `weight[${state.id}] - строка ${state.id} из ${VOCAB}, ${EMBED_DIM} чисел`;
+  $("table").replaceChildren(...ids.map((r, k) => {
+    const texts = cells(r);
+    return el("tr", { class: r === state.id ? "is-pick" : "" },
+      el("th", { scope: "row" }, String(r)),
+      rows[k].map((v, d) => el("td", { style: `background:${heat(v)}`, title: texts[d] })));
+  }));
+  $("values").replaceChildren(...cells(state.id).map((text, d) => el("li", {}, el("small", {}, String(d)), el("span", {}, text))));
+  const phrase = TOKENS.map((t) => t.id);
+  $("shapes").textContent = `token_embedding(torch.tensor([${state.id}])).shape  →  ${shape(1)}\n`
+    + `token_embedding(torch.tensor([${phrase.join(", ")}])).shape  →  ${shape(phrase.length)}`;
+  $("caption").textContent = `«${label(piece)}» - это просто строка ${state.id}. Строки ${state.id - 1} и ${state.id + 1} - соседи по номеру, но числа у них свои: ID только говорит, какую строку взять.`;
+}
+
+const bar = presets($("tokens"), TOKENS.map((t) => ({ label: `${label(t.piece)} ${t.id}`, value: t.id })),
+  (id) => { state.id = id; render(); });
+bar.setActive(1);
+render();
+ready();
+</script>
+</body>
+</html>

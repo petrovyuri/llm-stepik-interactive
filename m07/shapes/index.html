@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Формы и параметры</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.chain { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+.op { padding-bottom: 6px; font-size: 20px; color: var(--muted); }
+.block { display: grid; gap: 4px; justify-items: start; }
+.block__head { display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
+.block__name { font-size: 12.5px; color: var(--muted); }
+.block__shape { font-size: 12px; }
+.ids { border-collapse: separate; border-spacing: 2px; font-size: 10px; }
+.ids td { padding: 0 2px; text-align: right; background: var(--bg); border: 1px solid var(--line); border-radius: 3px; }
+.cube { display: grid; gap: 3px; }
+.cube__row { display: flex; gap: 2px; }
+.cube__row.is-ghost { opacity: .3; }
+.cube__cell { width: 12px; border-radius: 2px; background: repeating-linear-gradient(to bottom, currentColor 0 1px, transparent 1px 2px); }
+.cube--tok { color: var(--cyan); }
+.cube--pos { color: var(--orange); }
+.cube--out { color: var(--green); }
+.weights { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.weights th, .weights td { padding: 1px 6px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.weights th { font-weight: 400; color: var(--muted); }
+.weights th:first-child, .weights td:first-child { text-align: left; }
+.weights tr.is-mine td { color: var(--cyan); }
+.weights-note { margin: 4px 0 0; font-size: 12px; }
+@media (max-width: 520px) {
+  .weights { font-size: 11.5px; }
+  .weights th, .weights td { padding: 1px 3px; }
+  .weights .wide { display: none; }
+}
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 7 · урок «Код. Слои эмбеддингов»</p>
+<h1>Формы тензоров и вес эмбеддингов</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row">
+    <div class="slider-holder" id="batch"></div>
+    <div class="slider-holder" id="len"></div>
+    <div class="slider-holder" id="dim"></div>
+  </div>
+</div>
+<div class="panel"><div class="chain" id="chain"></div></div>
+<div class="panel">
+  <table class="weights mono" id="weights" aria-label="Сколько параметров в слое эмбеддингов"></table>
+  <p class="muted weights-note" id="weights-note">Память - во float32, по 4 байта на число. В bfloat16, как в config.json DeepSeek, вдвое меньше.</p>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+
+<script type="module">
+import { DIMS, MAX_BATCH, MAX_LEN, REFERENCE, VOCAB, batchIds, paramsText, shapes } from "./logic.js";
+import { el, ready, slider } from "../../kit/ui.js";
+
+const $ = (id) => document.getElementById(id);
+const state = { B: 2, L: 4, D: 16 };
+const depth = (D) => D / 3 + 2;   // высота клетки в px: глубина D видна на глаз
+
+function cube(kind, rows, ghosts = 0) {
+  const row = (ghost) => el("div", { class: ghost ? "cube__row is-ghost" : "cube__row" },
+    Array.from({ length: state.L }, () => el("span", { class: "cube__cell", style: `height:${depth(state.D)}px` })));
+  return el("div", { class: `cube cube--${kind}` },
+    Array.from({ length: rows }, () => row(false)), Array.from({ length: ghosts }, () => row(true)));
+}
+
+function block(name, body, shape, id) {
+  return el("div", { class: "block" },
+    el("div", { class: "block__head" }, el("span", { class: "block__name mono" }, name), el("span", { class: "block__shape mono", id }, shape)),
+    body);
+}
+
+function render() {
+  const s = shapes(state.B, state.L, state.D);
+  const ids = el("table", { class: "ids mono" },
+    batchIds(state.B, state.L).map((r) => el("tr", {}, r.map((id) => el("td", {}, String(id))))));
+  $("chain").replaceChildren(
+    block("batch_x", ids, s.x, "x-shape"), el("span", { class: "op" }, "→"),
+    block("token_emb", cube("tok", state.B), s.tok, "tok-shape"), el("span", { class: "op" }, "+"),
+    block("pos_emb", cube("pos", 1, state.B - 1), s.pos, "pos-shape"), el("span", { class: "op" }, "="),
+    block("embedded_x", cube("out", state.B), s.out, "out-shape"));
+  const rows = [{ name: "ваши настройки", vocab: VOCAB, positions: state.L, dim: state.D, mine: true }, ...REFERENCE];
+  $("weights").replaceChildren(
+    el("tr", {}, ["модель", "словарь", "позиций", "размер", "параметров", "память"]
+      .map((h, i) => el("th", { class: i === 1 || i === 2 ? "wide" : "" }, h))),
+    ...rows.map((r) => {
+      const t = paramsText(r.vocab, r.positions, r.dim);
+      return el("tr", { class: r.mine ? "is-mine" : "" },
+        el("td", {}, r.name), el("td", { class: "wide" }, String(r.vocab)),
+        el("td", { class: "wide" }, r.positions ? String(r.positions) : "нет (RoPE)"),
+        el("td", {}, String(r.dim)), el("td", {}, t.params), el("td", {}, t.memory));
+    }));
+  $("caption").textContent = state.B === 1
+    ? `pos_emb [1, ${state.L}, ${state.D}] и token_emb [1, ${state.L}, ${state.D}] уже одной формы - растягивать нечего.`
+    : `pos_emb [1, ${state.L}, ${state.D}] один на весь пакет: при сложении torch растягивает его до [${state.B}, ${state.L}, ${state.D}].`;
+}
+
+slider($("batch"), { label: "batch_size", min: 1, max: MAX_BATCH, step: 1, value: state.B,
+  onInput: (v) => { state.B = v; render(); } });
+slider($("len"), { label: "max_length", min: 1, max: MAX_LEN, step: 1, value: state.L,
+  onInput: (v) => { state.L = v; render(); } });
+slider($("dim"), { label: "embed_dim", min: 0, max: DIMS.length - 1, step: 1, value: DIMS.indexOf(state.D),
+  format: (i) => String(DIMS[i]), onInput: (i) => { state.D = DIMS[i]; render(); } });
+render();
+ready();
+</script>
+</body>
+</html>

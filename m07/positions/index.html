@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Переставьте слова</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.words { display: flex; flex-wrap: wrap; gap: 6px; }
+.words .chip[aria-pressed="true"] { border-color: var(--yellow); color: var(--yellow); }
+.grid { display: grid; gap: 8px 16px; }
+.block { display: grid; grid-template-columns: 50px repeat(5, minmax(0, 1fr)); gap: 1px 4px; font-size: 11px; line-height: 1.3; }
+.grid .head { grid-column: 1 / -1; font-size: 12.5px; }
+@media (min-width: 521px) { .grid { grid-template-columns: 1fr 1fr; } }
+.grid .num { text-align: right; white-space: nowrap; }
+.grid .tok { color: var(--cyan); }
+.grid .pos { color: var(--orange); }
+.grid .sum { color: var(--green); }
+.grid .lbl { color: var(--muted); }
+.verdict-line { margin: 8px 0 0; font-size: 13.5px; }
+.note { margin: 6px 0 0; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 7 · урок «Positional Encoding»</p>
+<h1>Переставьте слова: что меняют позиции</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row" id="orders"></div>
+  <div class="words row--top" id="words" role="group" aria-label="Порядок токенов: щёлкните два слова, чтобы поменять их местами"></div>
+</div>
+<div class="panel">
+  <div class="grid mono" id="grid"></div>
+  <p class="verdict-line" id="same"></p>
+  <p class="verdict-line" id="changed"></p>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+<p class="muted note">Числа случайные (seed 42): слой ещё не обучен, у вас будут другие. Чтобы получить такие же, поставьте <code>torch.manual_seed(42)</code> перед созданием слоя.</p>
+
+<script type="module">
+import { ORDER, PRESETS, changedText, piece, swap, vectorTexts } from "./logic.js";
+import { el, presets, ready } from "../../kit/ui.js";
+
+const $ = (id) => document.getElementById(id);
+const label = (p) => p.replace(/^ /, "␣");
+const PARTS = [["tok", "токен"], ["pos", "позиция"], ["sum", "сумма"]];
+const state = { order: [...ORDER], pick: null };
+const same = (a, b) => a.join() === b.join();
+
+function render() {
+  $("words").replaceChildren(...state.order.map((id, p) => el("button", {
+    type: "button", class: "chip", "aria-pressed": String(state.pick === p), onclick: () => clickWord(p),
+  }, `${p}: ${label(piece(id))}`)));
+  const texts = vectorTexts(state.order);
+  $("grid").replaceChildren(...state.order.map((id, p) => el("div", { class: "block" },
+    el("div", { class: "head" }, `позиция ${p}: ${label(piece(id))} (ID ${id})`),
+    ...PARTS.flatMap(([key, name]) => [
+      el("span", { class: `lbl ${key}` }, name),
+      ...texts[p][key].map((t) => el("span", { class: `num ${key}` }, t)),
+    ]))));
+  $("same").textContent = "Без позиций: набор векторов тот же, что и в исходном порядке, - разницы не видно.";
+  $("changed").textContent = changedText(state.order);
+  const moved = state.order.findIndex((id, p) => id !== ORDER[p]);
+  $("caption").textContent = state.pick !== null
+    ? `Выбрано «${label(piece(state.order[state.pick]))}» - щёлкните второе слово.`
+    : moved === -1
+      ? "Исходный порядок. Сумма на позиции 0 - тот самый «Первый вектор» из вывода main.py урока 3 (с seed 42)."
+      : `«${label(piece(state.order[moved]))}» теперь на позиции ${moved}: к его вектору прибавился вектор позиции ${moved}, и сумма стала другой.`;
+}
+
+function clickWord(p) {
+  if (state.pick === null) state.pick = p;
+  else if (state.pick === p) state.pick = null;
+  else {
+    state.order = swap(state.order, state.pick, p);
+    state.pick = null;
+    bar.setActive(PRESETS.findIndex((x) => same(x.order, state.order)));
+  }
+  render();
+}
+
+const bar = presets($("orders"), PRESETS.map((x) => ({ label: x.label, value: x.order })), (order) => {
+  state.order = [...order];
+  state.pick = null;
+  render();
+});
+bar.setActive(0);
+render();
+ready();
+</script>
+</body>
+</html>

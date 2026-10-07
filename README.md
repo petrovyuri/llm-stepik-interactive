@@ -33,8 +33,15 @@
 - [Скользящее окно](https://petrovyuri.github.io/llm-stepik-interactive/m06/sliding-window/) - урок «Класс Dataset»
 - [DataLoader: пакеты](https://petrovyuri.github.io/llm-stepik-interactive/m06/dataloader/) - урок «DataLoader»
 
+Модуль 7 «Векторизация»:
+
+- [От ID к вектору](https://petrovyuri.github.io/llm-stepik-interactive/m07/embedding-table/) - урок «Векторные представления»
+- [Карта слов GPT-2](https://petrovyuri.github.io/llm-stepik-interactive/m07/word-map/) - урок «Векторные представления»
+- [Переставьте слова](https://petrovyuri.github.io/llm-stepik-interactive/m07/positions/) - урок «Positional Encoding»
+- [Формы и параметры](https://petrovyuri.github.io/llm-stepik-interactive/m07/shapes/) - урок «Код. Слои эмбеддингов»
+
 ## Как это устроено
 
-Обычные HTML-страницы без сборки и сторонних библиотек, опубликованные через GitHub Pages. В `kit/` лежат общие стили и компоненты, в `mNN/<демо>/` - страница демо и файл `logic.js` с её вычислениями.
+Обычные HTML-страницы без сборки и сторонних библиотек, опубликованные через GitHub Pages. В `kit/` лежат общие стили и компоненты, в `mNN/<демо>/` - страница демо, файл `logic.js` с её вычислениями и, если демо нужны готовые числа (векторы, координаты), файл `data.js`.
 
 Здесь только готовые страницы. Исходники, тесты и эталонные расчёты на Python и PyTorch, с которыми сверяются числа в демо, лежат в рабочем репозитории автора курса.
