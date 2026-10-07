@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BPE по шагам</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.field { width: 100%; padding: 8px 10px; font-size: 15px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+.field.is-invalid { border-color: var(--red); color: var(--red); }
+.board { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.words { flex: 1 1 320px; min-width: 0; display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.word { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.word .name { flex: none; width: 7.5em; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.sym { padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); font-size: 13.5px; }
+.sym.is-end { color: var(--muted); }
+.sym.is-new { border-color: var(--orange); color: var(--orange); }
+.pairs { flex: 0 1 200px; border-collapse: collapse; font-size: 13.5px; }
+.pairs th { color: var(--muted); font-weight: 400; text-align: left; padding: 0 8px 4px; font-size: 12.5px; }
+.pairs td { padding: 2px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pairs tr.is-best td { color: var(--orange); }
+.log { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
+.log li { padding: 1px 7px; border: 1px solid var(--line); border-radius: 10px; }
+.log li.is-now { border-color: var(--orange); color: var(--orange); }
+.log li.more { border-color: transparent; color: var(--muted); }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 5 · урок «BPE»</p>
+<h1>Как BPE собирает словарь из частых пар</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row" id="presets"></div>
+  <div class="row--top">
+    <input class="field mono" id="corpus" type="text" maxlength="120" autocomplete="off" spellcheck="false" aria-label="Корпус: слова через запятую">
+  </div>
+  <div class="row row--top">
+    <div class="slider-holder" id="merges"></div>
+    <button type="button" id="step">шаг</button>
+    <button type="button" class="btn-play" id="play">▶ до конца</button>
+    <button type="button" id="reset">сброс</button>
+    <span class="muted" id="counter"></span>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="board">
+    <ul class="words mono" id="words" aria-label="Слова корпуса"></ul>
+    <table class="pairs mono"><thead><tr><th>пара</th><th>раз</th></tr></thead><tbody id="pairs"></tbody></table>
+  </div>
+  <ol class="log mono" id="log" aria-label="Слияния"></ol>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+
+<script type="module">
+import { DEFAULT_MERGES, MAX_MERGES, parseCorpus, stepLine, train } from "./logic.js";
+import { el, presets, slider, stepPlayer, ready } from "../../kit/ui.js";
+
+const LOG_SIZE = 8;   // журнал - последние слияния: 20 штук не помещаются по высоте
+const START = "Начальный словарь: каждое слово - список символов и </w>. Нажмите «шаг».";
+const PRESETS = [
+  { label: "корпус урока", value: "Привет, мир, Приветик, мирный" },
+  { label: "мир, мир, мирный", value: "мир, мир, мирный" },
+  { label: "кошка, мама", value: "кошка, мама" },
+  { label: "low, lower, newest, widest", value: "low, lower, newest, widest" },
+];
+const state = { text: PRESETS[0].value, merges: DEFAULT_MERGES, run: null, pos: 0, error: "" };
+const $ = (id) => document.getElementById(id);
+const input = $("corpus");
+input.value = state.text;
+
+/** Пересчитать обучение; проигрывание - остановить до смены данных. */
+function rebuild() {
+  player.stop();
+  const parsed = parseCorpus(state.text);
+  state.error = parsed.ok ? "" : parsed.error;
+  state.run = parsed.ok ? train(parsed.words, state.merges) : null;
+  state.pos = 0;
+  input.classList.toggle("is-invalid", !parsed.ok);
+  render();
+}
+
+function render() {
+  const run = state.run;
+  const caption = $("caption");
+  if (!run) {
+    $("words").replaceChildren();
+    $("pairs").replaceChildren();
+    $("log").replaceChildren();
+    $("step").disabled = true;
+    $("counter").textContent = "";
+    caption.className = "error";
+    caption.textContent = state.error;
+    return;
+  }
+  const { pos } = state;
+  const total = run.steps.length;
+  const vocab = pos === 0 ? run.initial : run.steps[pos - 1].vocab;
+  const fresh = pos === 0 ? null : run.steps[pos - 1].pair.join("");
+  $("words").replaceChildren(...vocab.map(([word, symbols]) => el("li", { class: "word" },
+    el("span", { class: "name" }, word),
+    ...symbols.map((sym) => el("span", { class: `sym${sym === "</w>" ? " is-end" : ""}${sym === fresh ? " is-new" : ""}` }, sym)))));
+  const table = pos < total ? run.steps[pos].top : run.after;
+  const best = pos < total ? run.steps[pos].pair : null;
+  $("pairs").replaceChildren(...table.map(([a, b, count]) => el("tr",
+    { class: best && a === best[0] && b === best[1] && count === run.steps[pos].count ? "is-best" : "" },
+    el("td", {}, `${a} + ${b}`), el("td", {}, String(count)))));
+  const first = Math.max(0, pos - LOG_SIZE);
+  $("log").replaceChildren(...(first > 0 ? [el("li", { class: "more" }, "…")] : []),
+    ...run.steps.slice(first, pos).map((step, k) => {
+      const i = first + k;
+      return el("li", { class: i === pos - 1 ? "is-now" : "" }, `${i + 1}: ${step.pair[0]}+${step.pair[1]}`);
+    }));
+  $("step").disabled = pos >= total;
+  $("counter").textContent = total < state.merges && pos >= total
+    ? `пар не осталось после шага ${total}` : `шаг ${pos} из ${total}`;
+  caption.className = "caption";
+  caption.textContent = pos === 0 ? START : stepLine(pos, run.steps[pos - 1].pair);
+}
+
+let playFrom = 0;
+const player = stepPlayer($("play"), {
+  steps: () => {
+    if (!state.run || state.pos >= state.run.steps.length) return [];
+    playFrom = state.pos;
+    return Array.from({ length: state.run.steps.length - state.pos }, (_, i) => String(i));
+  },
+  onStep(i) {
+    if (i >= 0) state.pos = playFrom + 1 + i;
+    render();
+  },
+  interval: 800,
+});
+
+$("step").addEventListener("click", () => {
+  player.stop();
+  if (state.run && state.pos < state.run.steps.length) state.pos += 1;
+  render();
+});
+$("reset").addEventListener("click", () => { player.stop(); state.pos = 0; render(); });
+input.addEventListener("input", () => {
+  player.stop();
+  state.text = input.value;
+  presetBar.setActive(null);
+  rebuild();
+});
+slider($("merges"), { label: "слияний (num_merges)", min: 1, max: MAX_MERGES, step: 1, value: state.merges,
+  onInput: (v) => { player.stop(); state.merges = v; rebuild(); } });
+
+const presetBar = presets($("presets"), PRESETS, (value) => {
+  player.stop();
+  state.text = value;
+  input.value = value;
+  rebuild();
+});
+presetBar.setActive(0);
+
+rebuild();
+ready();
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Словарь и [UNK]</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.field { width: 100%; padding: 8px 10px; font-size: 15px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+.field.is-invalid { border-color: var(--red); color: var(--red); }
+.label { margin: 6px 0 3px; font-size: 12.5px; }
+.vocab { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; }
+.vocab li { padding: 1px 7px; border: 1px solid var(--line); border-radius: 6px; }
+.vocab li b { margin-left: 6px; color: var(--cyan); font-weight: 500; }
+.vocab li.is-new { border-color: var(--green); }
+.add .chip { border-color: var(--green); color: var(--green); }
+.add .chip, #reset { padding: 2px 9px; font-size: 13px; }   /* компактно: 10 слов и 8 добавлений влезают в 600 px */
+.panel .row--top { margin-top: 6px; }
+.pipe { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.stage { display: grid; grid-template-columns: 9em 1fr; gap: 4px 10px; align-items: baseline; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.stage .what { color: var(--muted); }
+.val { white-space: pre-wrap; overflow-wrap: anywhere; }
+.unk { color: var(--red); }
+.space { color: var(--muted); }
+.status { margin: 6px 0 0; font-size: 14px; }
+@media (max-width: 520px) { .stage { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 5 · урок «Пишем простой токенизатор»</p>
+<h1>Словарь, [UNK] и обратный путь</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row" id="presets"></div>
+  <div class="row--top">
+    <input class="field mono" id="text" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-label="Строка">
+  </div>
+  <p class="muted label">word_vocab</p>
+  <ul class="vocab mono" id="vocab" aria-label="Словарь"></ul>
+  <div class="row row--top">
+    <div class="row add" id="add"></div>
+    <button type="button" id="reset">сброс словаря</button>
+  </div>
+</div>
+
+<div class="panel">
+  <ol class="pipe mono">
+    <li class="stage"><span class="what">text.split()</span><span class="val" id="words"></span></li>
+    <li class="stage"><span class="what">в ID</span><span class="val" id="ids"></span></li>
+    <li class="stage"><span class="what">обратно в текст</span><span class="val" id="restored"></span></li>
+  </ol>
+  <p class="status" id="status" aria-live="polite"></p>
+</div>
+
+<script type="module">
+import { MAX_ADDED, MAX_WORDS, run, vocabWith } from "./logic.js";
+import { pySplit, reprStr } from "../../kit/py.js";
+import { el, presets, ready } from "../../kit/ui.js";
+
+const PRESETS = [
+  { label: "пример урока", value: "Кот очень любит свежую сметану" },
+  { label: "Кот любит сметану", value: "Кот любит сметану" },
+  { label: "со знаками", value: "Кот, любит сметану!" },
+  { label: "с маленькой буквы", value: "кот любит сметану" },
+];
+const state = { text: PRESETS[0].value, added: [] };
+const $ = (id) => document.getElementById(id);
+const input = $("text");
+input.value = state.text;
+
+function render() {
+  const result = run(state.text, state.added);
+  const entries = vocabWith(state.added);
+  $("vocab").replaceChildren(...entries.map(([word, id]) =>
+    el("li", { class: state.added.includes(word) ? "is-new" : "" }, word, el("b", {}, String(id)))));
+  const full = state.added.length >= MAX_ADDED;
+  $("add").replaceChildren(...result.unknown.map((word) => el("button", {
+    type: "button", class: "chip", disabled: full, "aria-label": `Добавить в словарь: ${word}`,
+    onclick: () => { state.added.push(word); render(); },
+  }, `+ ${word}`)));
+  // Строки ровно как печатает урок; [UNK] - красным, «Пробел» - приглушённо.
+  const wordNodes = ["["];
+  result.words.forEach((word, i) => {
+    if (i) wordNodes.push(", ");
+    wordNodes.push(el("span", { class: result.unknown.includes(word) ? "unk" : "" }, reprStr(word)));
+  });
+  wordNodes.push("]");
+  $("words").replaceChildren(...wordNodes);
+  const idNodes = ["Идентификаторы слов: ["];
+  result.ids.forEach((id, i) => {
+    if (i) idNodes.push(", ");
+    idNodes.push(el("span", { class: id === 100 ? "unk" : id === 99 ? "space" : "" }, String(id)));
+  });
+  idNodes.push("]");
+  $("ids").replaceChildren(...idNodes);
+  const restoredNodes = ["Восстановленный текст: "];
+  result.restored.split(" ").forEach((word, i) => {
+    if (i) restoredNodes.push(" ");
+    restoredNodes.push(word === "[UNK]" ? el("span", { class: "unk" }, word) : word);
+  });
+  $("restored").replaceChildren(...restoredNodes);
+  $("status").className = `status ${result.status === "lost" ? "bad" : "good"}`;
+  $("status").textContent = result.message;
+}
+
+input.addEventListener("input", () => {
+  presetBar.setActive(null);
+  const tooLong = pySplit(input.value).length > MAX_WORDS;
+  input.classList.toggle("is-invalid", tooLong);
+  if (tooLong) {   // ступени показывают прошлую фразу, статус объясняет, почему
+    $("status").className = "status bad";
+    $("status").textContent = `Демо вмещает до ${MAX_WORDS} слов - сократите фразу.`;
+    return;
+  }
+  state.text = input.value;
+  render();
+});
+$("reset").addEventListener("click", () => { state.added = []; render(); });
+
+const presetBar = presets($("presets"), PRESETS, (value) => {
+  state.text = value;
+  input.value = value;
+  input.classList.remove("is-invalid");
+  render();
+});
+presetBar.setActive(0);
+
+render();
+ready();
+</script>
+</body>
+</html>

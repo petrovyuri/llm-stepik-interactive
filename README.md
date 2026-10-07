@@ -23,6 +23,11 @@
 - [От строки к токенам](https://petrovyuri.github.io/llm-stepik-interactive/m03/text-to-tokens/) - урок «Функции»
 - [Autograd: y = w · x](https://petrovyuri.github.io/llm-stepik-interactive/m03/autograd/) - урок «PyTorch самое нужное»
 
+Модуль 5 «Токенизация»:
+
+- [BPE по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m05/bpe-merges/) - урок «BPE»
+- [Словарь, [UNK] и обратный путь](https://petrovyuri.github.io/llm-stepik-interactive/m05/word-vocab/) - урок «Пишем простой токенизатор»
+
 ## Как это устроено
 
 Обычные HTML-страницы без сборки и сторонних библиотек, опубликованные через GitHub Pages. В `kit/` лежат общие стили и компоненты, в `mNN/<демо>/` - страница демо и файл `logic.js` с её вычислениями.
