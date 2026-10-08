@@ -40,6 +40,13 @@
 - [Переставьте слова](https://petrovyuri.github.io/llm-stepik-interactive/m07/positions/) - урок «Positional Encoding»
 - [Формы и параметры](https://petrovyuri.github.io/llm-stepik-interactive/m07/shapes/) - урок «Код. Слои эмбеддингов»
 
+Модуль 8 «Внимание без обучаемых весов»:
+
+- [Конвейер внимания](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-steps/) - уроки «Attention Scores», «Softmax», «Контекстные векторы»
+- [Внимание на плоскости](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-plane/) - урок «Контекстные векторы»
+- [Формы тензоров во внимании](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-shapes/) - урок «Код: контекстный вектор»
+- [Без весов на настоящих векторах](https://petrovyuri.github.io/llm-stepik-interactive/m08/real-vectors/) - урок «Код: контекстный вектор»
+
 ## Как это устроено
 
 Обычные HTML-страницы без сборки и сторонних библиотек, опубликованные через GitHub Pages. В `kit/` лежат общие стили и компоненты, в `mNN/<демо>/` - страница демо, файл `logic.js` с её вычислениями и, если демо нужны готовые числа (векторы, координаты), файл `data.js`.

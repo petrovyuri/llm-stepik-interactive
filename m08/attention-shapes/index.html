@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Формы тензоров во внимании</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.chain { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.chain li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 2px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.chain .shape { color: var(--cyan); }
+.chain li.is-key { border-color: var(--orange); }
+.mm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12.5px; }
+.box { display: grid; place-items: center; min-width: 26px; min-height: 18px; border: 1px solid; border-radius: 4px; }
+.box--a { border-color: var(--cyan); background: rgba(34, 211, 238, .15); }
+.box--b { border-color: var(--orange); background: rgba(249, 115, 22, .15); }
+.box--c { border-color: var(--green); background: rgba(52, 211, 153, .15); }
+.op { font-size: 18px; color: var(--muted); }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 8 · урок «Код: контекстный вектор»</p>
+<h1>Формы тензоров в SimpleSelfAttention</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row">
+    <div class="slider-holder" id="batch"></div>
+    <div class="slider-holder" id="len"></div>
+    <div class="slider-holder" id="dim"></div>
+  </div>
+  <label class="row row--top"><input type="checkbox" id="flat"> без батча: x формы [L, D]</label>
+</div>
+<div class="panel"><ol class="chain mono" id="chain"></ol></div>
+<div class="panel"><div class="mm mono" id="mm"></div></div>
+<p class="caption" id="caption" aria-live="polite"></p>
+
+<script type="module">
+import { DIMS, MAX_B, MAX_L, chain } from "./logic.js";
+import { el, ready, slider } from "../../kit/ui.js";
+
+const $ = (id) => document.getElementById(id);
+const state = { B: 2, L: 4, D: 16, batched: true };
+const CELL = 4;   // px на одну клетку в схеме умножения
+
+function box(kind, rows, cols) {
+  return el("span", { class: `box box--${kind}`, style: `width:${cols * CELL}px;height:${rows * CELL}px` }, `${rows}×${cols}`);
+}
+
+function render() {
+  const rows = chain(state.B, state.L, state.D, state.batched);
+  $("chain").replaceChildren(...rows.map((r) => el("li", { class: r.code === "Q @ K^T" ? "is-key" : "" },
+    el("span", { class: "code" }, r.code, r.code === "softmax(dim=-1)" ? el("span", { class: "muted" }, "  сумма каждой строки = 1") : null),
+    el("span", { class: "shape" }, r.shape))));
+  const { L, D } = state;
+  $("mm").replaceChildren(el("span", {}, "Q"), box("a", L, D), el("span", { class: "op" }, "@"),
+    el("span", {}, "Kᵀ"), box("b", D, L), el("span", { class: "op" }, "="), el("span", {}, "scores"), box("c", L, L));
+  $("caption").textContent = `Q @ K^T: внутренние размеры ${D} совпадают и «съедаются», остаётся [${L}, ${L}] - каждый токен с каждым. `
+    + (state.batched ? `Батч ${state.B} просто идёт впереди.` : "Без батча класс добавляет ось unsqueeze(0), а в конце убирает её squeeze(0).");
+}
+
+slider($("batch"), { label: "B (batch)", min: 1, max: MAX_B, step: 1, value: state.B, onInput: (v) => { state.B = v; render(); } });
+slider($("len"), { label: "L (seq_len)", min: 1, max: MAX_L, step: 1, value: state.L, onInput: (v) => { state.L = v; render(); } });
+slider($("dim"), { label: "D (embed_dim)", min: 0, max: DIMS.length - 1, step: 1, value: DIMS.indexOf(state.D),
+  format: (i) => String(DIMS[i]), onInput: (i) => { state.D = DIMS[i]; render(); } });
+$("flat").addEventListener("change", (e) => {
+  state.batched = !e.target.checked;
+  render();
+});
+render();
+ready();
+</script>
+</body>
+</html>

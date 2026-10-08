@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Внимание на плоскости</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.plane { display: block; width: 100%; max-width: 320px; height: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; touch-action: none; }
+.axis { stroke: var(--line); stroke-width: 1; }
+.vec { stroke: var(--muted); stroke-width: 1; }
+.att { stroke: var(--orange); stroke-linecap: round; opacity: .75; fill: none; }
+.name { font-size: 12px; fill: var(--ink); pointer-events: none; }
+.pt { cursor: grab; }
+.pt circle { stroke: var(--bg); stroke-width: 1.5; }
+.pt.is-query circle, .pt:focus-visible circle { stroke: var(--yellow); stroke-width: 2.5; }
+.pt:focus-visible { outline: none; }
+.ctx { fill: none; stroke-width: 2; }
+.ctx-line { stroke-dasharray: 4 3; stroke-width: 1.2; }
+.coords { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.coords th, .coords td { padding: 2px 4px; }
+.coords th { font-weight: 400; }
+.coords input { width: 64px; padding: 3px 5px; font: inherit; color: var(--ink); text-align: right; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.coords input.is-invalid { border-color: var(--red); color: var(--red); }
+.note { margin: 6px 0 0; font-size: 12.5px; }
+@media (max-width: 520px) { .layout { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 8 · урок «Контекстные векторы»</p>
+<h1>Внимание на плоскости</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel"><div class="row" id="presets"></div></div>
+<div class="panel layout">
+  <svg class="plane" id="plane" viewBox="0 0 300 300" role="group" aria-label="Три вектора на плоскости"></svg>
+  <div>
+    <div class="row"><span class="muted">запрос:</span><span class="row" id="query"></span></div>
+    <table class="coords mono" id="coords"></table>
+    <label class="row row--top"><input type="checkbox" id="all"> все контекстные векторы</label>
+    <p class="muted note">Точки можно тащить мышью или пальцем, двигать стрелками или вписать координаты: до 2 знаков, по модулю не больше 1.5.</p>
+  </div>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+
+<script type="module">
+import { DOT, MID, PLANE, PRESETS, SCALE, TOKENS, attend, captionText, coordText, labels, parseCoord, toPx } from "./logic.js";
+import { el, presets, ready, svg } from "../../kit/ui.js";
+
+const COLORS = ["var(--cyan)", "var(--purple)", "var(--green)"];
+const $ = (id) => document.getElementById(id);
+const state = { P: PRESETS[0].p.map((p) => [...p]), q: 0, all: false, bad: new Set() };
+const clamp = (v) => Math.max(-150, Math.min(150, v));
+const plane = $("plane");
+const layer = svg("g");
+plane.append(svg("line", { class: "axis", x1: 0, y1: MID, x2: PLANE, y2: MID }),
+  svg("line", { class: "axis", x1: MID, y1: 0, x2: MID, y2: PLANE }), layer);
+
+function label(x, y, text) {
+  const node = svg("text", { class: "name", x: x.toFixed(1), y: y.toFixed(1) });
+  node.textContent = text;
+  return node;
+}
+
+let dragging = null;
+const points = TOKENS.map((name, k) => {
+  const g = svg("g", { class: "pt", tabindex: 0, role: "button", "aria-label": `${name}: тащите или двигайте стрелками` });
+  g.append(svg("circle", { r: DOT, fill: COLORS[k] }));
+  g.addEventListener("pointerdown", (e) => {
+    dragging = k;
+    g.setPointerCapture(e.pointerId);
+    pick(k);
+  });
+  g.addEventListener("pointermove", (e) => {
+    if (dragging !== k) return;
+    const pt = plane.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const p = pt.matrixTransform(plane.getScreenCTM().inverse());
+    place(k, [Math.round(((p.x - MID) / SCALE) * 100), Math.round(((MID - p.y) / SCALE) * 100)]);
+  });
+  g.addEventListener("pointerup", () => { dragging = null; });
+  g.addEventListener("keydown", (e) => {
+    const d = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, 5], ArrowDown: [0, -5] }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    place(k, [state.P[k][0] + d[0], state.P[k][1] + d[1]]);
+  });
+  plane.append(g);
+  return g;
+});
+
+const inputs = TOKENS.map((name, k) => [0, 1].map((c) => el("input", {
+  type: "text",
+  autocomplete: "off",
+  "aria-label": `${name}, ${c ? "y" : "x"}`,
+  oninput: (e) => {
+    const v = parseCoord(e.target.value);
+    e.target.classList.toggle("is-invalid", v === null);
+    if (v === null) state.bad.add(`${k},${c}`);
+    else {
+      state.bad.delete(`${k},${c}`);
+      state.P[k][c] = v;
+    }
+    render();
+  },
+})));
+$("coords").replaceChildren(el("tr", {}, el("th", {}), el("th", {}, "x"), el("th", {}, "y")),
+  ...TOKENS.map((name, k) => el("tr", {}, el("th", { style: `color:${COLORS[k]}` }, name), inputs[k].map((inp) => el("td", {}, inp)))));
+
+function syncInputs() {
+  inputs.forEach((pair, k) => pair.forEach((inp, c) => {
+    inp.value = coordText(state.P[k][c]);
+    inp.classList.remove("is-invalid");
+  }));
+  state.bad.clear();
+}
+
+/** Новая позиция точки k (мышь, стрелки) - в пределах ±1.5. */
+function place(k, [x, y]) {
+  state.P[k] = [clamp(x), clamp(y)];
+  syncInputs();
+  render();
+}
+
+function pick(k) {
+  state.q = k;
+  bar.setActive(k);
+  render();
+}
+
+function render() {
+  const { weights, context } = attend(state.P);
+  const px = state.P.map(toPx);
+  const [qx, qy] = px[state.q];
+  const items = px.map(([x, y]) => svg("line", { class: "vec", x1: MID, y1: MID, x2: x.toFixed(1), y2: y.toFixed(1) }));
+  px.forEach(([x, y], j) => {
+    const w = weights[state.q][j];
+    const width = (1 + 9 * w).toFixed(2);
+    if (j === state.q) {
+      items.push(svg("circle", { class: "att", cx: qx.toFixed(1), cy: qy.toFixed(1), r: 13, "stroke-width": width }));
+    } else {
+      items.push(svg("line", { class: "att", x1: qx.toFixed(1), y1: qy.toFixed(1), x2: x.toFixed(1), y2: y.toFixed(1), "stroke-width": width }));
+    }
+  });
+  (state.all ? [0, 1, 2] : [state.q]).forEach((k) => {
+    const [zx, zy] = toPx([context[k][0] * 100, context[k][1] * 100]);
+    items.push(svg("line", { class: "ctx-line", x1: px[k][0].toFixed(1), y1: px[k][1].toFixed(1), x2: zx.toFixed(1), y2: zy.toFixed(1), stroke: COLORS[k] }),
+      svg("circle", { class: "ctx", cx: zx.toFixed(1), cy: zy.toFixed(1), r: 6, stroke: COLORS[k] }));
+  });
+  labels(state.P, state.q).forEach((l) => items.push(label(l.x, l.y, l.text)));
+  layer.replaceChildren(...items);
+  plane.append(points[state.q]);   // запрос - поверх соседних точек, его можно схватить
+  points.forEach((g, k) => {
+    g.setAttribute("transform", `translate(${px[k][0].toFixed(1)} ${px[k][1].toFixed(1)})`);
+    g.classList.toggle("is-query", k === state.q);
+  });
+  $("caption").textContent = state.bad.size
+    ? "Координаты - до 2 знаков после точки, по модулю не больше 1.5."
+    : captionText(state.P, state.q);
+}
+
+presets($("presets"), PRESETS.map((p) => ({ label: p.label, value: p.p })), (p) => {
+  state.P = p.map((xy) => [...xy]);
+  syncInputs();
+  render();
+}).setActive(0);
+const bar = presets($("query"), TOKENS.map((t, i) => ({ label: t, value: i })), (i) => pick(i));
+bar.setActive(0);
+$("all").addEventListener("change", (e) => {
+  state.all = e.target.checked;
+  render();
+});
+syncInputs();
+render();
+ready();
+</script>
+</body>
+</html>

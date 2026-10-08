@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конвейер внимания</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.top { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-start; }
+.xbox { display: flex; gap: 6px; align-items: flex-start; }
+.names { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.names span { height: 34px; display: flex; align-items: center; justify-content: flex-end; }
+#x { --cell: 52px; }
+.controls { display: grid; gap: 8px; }
+.work { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-start; }
+.res { border-collapse: separate; border-spacing: 3px; font-size: 13px; }
+.res th { padding: 0 4px; font-weight: 400; color: var(--muted); }
+.res td { min-width: 58px; padding: 4px 6px; text-align: right; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.res tr.is-row td { border-color: var(--cyan); background: rgba(34, 211, 238, .14); }
+.lines { flex: 1 1 300px; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.5; }
+.lines li { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lines li.is-now { color: var(--yellow); }
+.lines li.is-hidden { visibility: hidden; }
+.note { margin: 6px 0 0; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 8 · уроки «Attention Scores», «Softmax», «Контекстные векторы»</p>
+<h1>Конвейер внимания: scores → softmax → контекст</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row" id="presets"></div>
+  <div class="top row--top">
+    <div class="xbox"><div class="names mono" id="names"></div><div id="x"></div></div>
+    <div class="controls">
+      <div class="row" id="stages"></div>
+      <div class="row"><span class="muted">запрос:</span><span class="row" id="query"></span>
+        <button type="button" class="btn-play" id="play">▶ по шагам</button></div>
+    </div>
+  </div>
+</div>
+<div class="panel work">
+  <table class="res mono" id="result"></table>
+  <ol class="lines mono" id="lines"></ol>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+<p class="muted note">Вручную мы округляем каждый шаг до 4 знаков, код считает без округлений - последняя цифра может отличаться.</p>
+
+<script type="module">
+import { PRESETS, TOKENS, contextLines, contextMatrix, parseCell, scoreLines, scoreMatrix, softmaxLines, units, weightMatrix } from "./logic.js";
+import { el, matrixView, presets, ready, stepPlayer } from "../../kit/ui.js";
+
+const STAGES = [
+  { value: "scores", label: "1. scores" },
+  { value: "softmax", label: "2. softmax" },
+  { value: "context", label: "3. контекст" },
+];
+const asked = new URLSearchParams(location.search).get("stage");
+const state = {
+  X: PRESETS[0].x.map((row) => [...row]),
+  bad: new Set(),
+  stage: STAGES.some((s) => s.value === asked) ? asked : "context",
+  q: 0,
+  step: -1,
+};
+const $ = (id) => document.getElementById(id);
+const show = (X) => X.map((row) => row.map((v) => units(v, 2)));
+const CAPTIONS = {
+  scores: (t) => `Строка «${t}»: скалярное произведение с каждым токеном. Матрица симметрична: The · cat = cat · The.`,
+  softmax: (t) => `Строка «${t}»: экспоненты делим на их сумму - веса положительные и в сумме дают 1.`,
+  context: (t) => `Контекстный вектор «${t}» - смесь всех трёх векторов X с весами из softmax.`,
+};
+$("names").replaceChildren(...TOKENS.map((t) => el("span", {}, t)));
+
+/** Строки расчёта текущего этапа для токена-запроса. */
+function lines() {
+  if (state.stage === "scores") return scoreLines(state.X, state.q);
+  if (state.stage === "softmax") {
+    const s = softmaxLines(state.X, state.q);
+    return [...s.exps, s.sum, ...s.divs, s.check];
+  }
+  return contextLines(state.X, state.q);
+}
+
+function table() {
+  if (state.stage === "scores") return { cols: TOKENS, cells: scoreMatrix(state.X) };
+  if (state.stage === "softmax") return { cols: TOKENS, cells: weightMatrix(state.X).manual };
+  return { cols: ["z₁", "z₂", "z₃"], cells: contextMatrix(state.X).manual };
+}
+
+function render() {
+  xView.mark("is-invalid", (i, j) => state.bad.has(`${i},${j}`));
+  const { cols, cells } = table();
+  $("result").replaceChildren(
+    el("tr", {}, el("th", {}), cols.map((c) => el("th", {}, c))),
+    ...cells.map((row, i) => el("tr", { class: i === state.q ? "is-row" : "" },
+      el("th", {}, TOKENS[i]), row.map((v) => el("td", {}, v)))),
+  );
+  $("lines").replaceChildren(...lines().map((text, k) => el("li", {
+    class: state.step === -1 ? "" : k === state.step ? "is-now" : k > state.step ? "is-hidden" : "",
+  }, text)));
+  $("caption").textContent = state.bad.size
+    ? "Числа - до 2 знаков после точки, по модулю не больше 2. Красные клетки в расчёт не попали."
+    : CAPTIONS[state.stage](TOKENS[state.q]);
+}
+
+const xView = matrixView($("x"), show(state.X), {
+  editable: true,
+  label: "X",
+  onEdit: (i, j, text) => change(() => {
+    const v = parseCell(text);
+    if (v === null) state.bad.add(`${i},${j}`);
+    else {
+      state.bad.delete(`${i},${j}`);
+      state.X[i][j] = v;
+    }
+  }),
+});
+
+const player = stepPlayer($("play"), {
+  steps: () => lines(),
+  onStep(i) {
+    state.step = i;
+    render();
+  },
+  interval: 900,
+});
+
+/** Любое изменение данных: сначала остановить проигрывание. */
+function change(update) {
+  player.stop();
+  update();
+  render();
+}
+
+presets($("presets"), PRESETS.map((p) => ({ label: p.label, value: p.x })), (x) => change(() => {
+  state.X = x.map((row) => [...row]);
+  state.bad.clear();
+  xView.set(show(state.X));
+})).setActive(0);
+presets($("stages"), STAGES, (v) => change(() => { state.stage = v; }))
+  .setActive(STAGES.findIndex((s) => s.value === state.stage));
+presets($("query"), TOKENS.map((t, i) => ({ label: t, value: i })), (i) => change(() => { state.q = i; })).setActive(0);
+render();
+ready();
+</script>
+</body>
+</html>

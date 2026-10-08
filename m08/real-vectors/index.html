@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Без весов на настоящих векторах</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.heat { border-collapse: separate; border-spacing: 3px; font-size: 13px; }
+.heat th { padding: 0 4px; font-weight: 400; color: var(--muted); }
+.heat td { min-width: 52px; padding: 5px 6px; text-align: right; border: 1px solid var(--line); border-radius: 6px; }
+.norms { margin: 8px 0 0; font-size: 12.5px; overflow-wrap: anywhere; }
+.note { margin: 6px 0 0; font-size: 12.5px; }
+@media (max-width: 520px) {
+  .heat { font-size: 10px; border-spacing: 2px; }
+  .heat th { padding: 0 2px; }
+  .heat td { min-width: 0; padding: 3px 1px; }
+}
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 8 · урок «Код: контекстный вектор»</p>
+<h1>Внимание без весов на настоящих векторах</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row" id="modes"></div>
+  <div class="row row--top" id="views"></div>
+</div>
+<div class="panel">
+  <table class="heat mono" id="heat" aria-label="Матрица внимания 5×5: строки - запрос, столбцы - на кого смотрим"></table>
+  <p class="norms mono muted" id="norms"></p>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+<p class="muted note">Это тот же SimpleSelfAttention из урока, без обучаемых весов. Осмысленное внимание появится, когда в модуле 9 мы добавим W_Q, W_K и W_V.</p>
+
+<script type="module">
+import { captionText, cellText, label, normText, pieces, value } from "./logic.js";
+import { el, presets, ready } from "../../kit/ui.js";
+
+const $ = (id) => document.getElementById(id);
+const NAMES = pieces().map(label);
+const state = { mode: "gpt2", view: "weights" };
+
+function heat(v, top) {
+  const a = (0.08 + 0.8 * Math.min(1, Math.abs(v) / top)).toFixed(2);
+  return `rgba(249, 115, 22, ${a})`;
+}
+
+function render() {
+  const all = [];
+  for (let i = 0; i < 5; i += 1) for (let j = 0; j < 5; j += 1) all.push(Math.abs(value(state.mode, state.view, i, j)));
+  const top = state.view === "weights" ? 1 : Math.max(...all);
+  $("heat").replaceChildren(
+    el("thead", {}, el("tr", {}, el("th", {}), NAMES.map((n) => el("th", {}, n)))),
+    el("tbody", {}, NAMES.map((n, i) => el("tr", {}, el("th", {}, n),
+      NAMES.map((_, j) => el("td", { style: `background:${heat(value(state.mode, state.view, i, j), top)}` }, cellText(state.mode, state.view, i, j)))))),
+  );
+  $("norms").textContent = `x·x: ${NAMES.map((n, i) => `${n} ${normText(state.mode, i)}`).join(" · ")}`;
+  $("caption").textContent = captionText(state.mode);
+}
+
+presets($("modes"), [{ label: "GPT-2 (768 чисел)", value: "gpt2" }, { label: "наш слой (16 чисел, seed 42)", value: "ours" }],
+  (mode) => { state.mode = mode; render(); }).setActive(0);
+presets($("views"), [{ label: "веса (softmax)", value: "weights" }, { label: "scores (x·x)", value: "scores" }],
+  (view) => { state.view = view; render(); }).setActive(0);
+render();
+ready();
+</script>
+</body>
+</html>
