@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Научите «он» смотреть на «сметану»</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+.phrase { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.bars { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.bars li { display: grid; grid-template-columns: 92px 1fr 56px; gap: 10px; align-items: center; font-size: 14px; }
+.bars .name small { color: var(--muted); font-size: 11.5px; }
+.track { height: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.fill { height: 100%; width: 0; background: var(--cyan); transition: width .12s; }
+.bars li.is-target .fill { background: var(--orange); }
+.bars li.is-target .pct { color: var(--orange); }
+.pct { text-align: right; }
+.status { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 0 0; font-size: 14px; }
+.mats { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.mat { display: grid; gap: 4px; }
+.mat .muted { font-size: 13px; }
+.mat .matrix { --cell: 58px; }
+.mat .matrix__cell { height: 28px; font-size: 13px; }
+.note { margin: 4px 0 0; font-size: 12.5px; }
+@media (max-width: 520px) { .bars li { grid-template-columns: 78px 1fr 50px; } .mat .matrix { --cell: 50px; } }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 9 · урок «Обучаемые матрицы W_Q, W_K, W_V»</p>
+<h1>Научите «он» смотреть на «сметану»</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <p class="phrase">«Кот любил сметану, потому что он был вкусный». Куда смотрит «он»:</p>
+  <ol class="bars mono" id="bars"></ol>
+  <p class="status mono"><span id="step"></span><span id="loss"></span></p>
+  <div class="row row--top">
+    <button type="button" class="btn-play" id="train">▶ обучать</button>
+    <button type="button" id="one">шаг</button>
+    <button type="button" id="reset">сначала</button>
+  </div>
+</div>
+<div class="panel mats">
+  <div class="mat"><span class="muted">W_Q</span><div id="wq"></div></div>
+  <div class="mat"><span class="muted">W_K</span><div id="wk"></div></div>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+<p class="muted note">Векторы игрушечные: по 3 числа, подобраны вручную, чтобы «Кот» и «сметану» были похожи. Деления на √d и V здесь нет: демо только про то, куда смотрит «он».</p>
+
+<script type="module">
+import { QUERY, STEPS, TARGET, TOKENS, captionText, lossText, percentTexts, state } from "./logic.js";
+import { el, matrixView, ready, stepPlayer } from "../../kit/ui.js";
+import { fixed } from "../../kit/format.js";
+
+const $ = (id) => document.getElementById(id);
+let n = 0;
+let base = 0;
+
+const rows = TOKENS.map((t, j) => {
+  const fill = el("div", { class: "fill" });
+  const pct = el("span", { class: "pct" });
+  const name = el("span", { class: "name" }, t, j === QUERY ? el("small", {}, " (запрос)") : "");
+  $("bars").append(el("li", { class: j === TARGET ? "is-target" : "" }, name, el("div", { class: "track" }, fill), pct));
+  return { fill, pct };
+});
+const show = (W) => W.map((row) => row.map((v) => fixed(v, 2)));
+const wq = matrixView($("wq"), show(state(0).WQ), { label: "W_Q" });
+const wk = matrixView($("wk"), show(state(0).WK), { label: "W_K" });
+
+function render() {
+  const s = state(n);
+  const texts = percentTexts(n);
+  rows.forEach((r, j) => {
+    r.fill.style.width = `${(s.weights[j] * 100).toFixed(1)}%`;
+    r.pct.textContent = texts[j];
+  });
+  $("step").textContent = `Шаг ${n} из ${STEPS}`;
+  $("loss").textContent = lossText(n);
+  const before = n > 0 ? state(n - 1) : s;
+  for (const [view, key] of [[wq, "WQ"], [wk, "WK"]]) {
+    view.set(show(s[key]));
+    view.mark("is-hit", (i, j) => fixed(s[key][i][j], 2) !== fixed(before[key][i][j], 2));
+  }
+  $("one").disabled = n === STEPS;
+  $("caption").textContent = captionText(n);
+}
+
+const player = stepPlayer($("train"), {
+  steps() {
+    if (n === STEPS) n = 0;
+    base = n;
+    return Array.from({ length: STEPS - base }, (_, i) => `шаг ${base + i + 1}`);
+  },
+  onStep(i) {
+    if (i >= 0) n = base + i + 1;
+    render();
+  },
+  interval: 150,
+});
+
+$("one").addEventListener("click", () => {
+  player.stop();
+  if (n < STEPS) n += 1;
+  render();
+});
+$("reset").addEventListener("click", () => {
+  player.stop();
+  n = 0;
+  render();
+});
+render();
+ready();
+</script>
+</body>
+</html>

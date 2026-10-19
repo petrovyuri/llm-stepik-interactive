@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Каузальная маска</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+h1 { margin-bottom: 8px; }
+.panel { padding: 10px; margin-bottom: 8px; }
+button { padding: 4px 9px; font-size: 13px; }
+.hint { margin: 6px 0 0; font-size: 12.5px; }
+.grids { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 8px; }
+.grid { display: grid; gap: 3px; }
+.grid[hidden] { display: none; }
+.grid > .muted { font-size: 12.5px; }
+.gbox { display: flex; gap: 6px; align-items: flex-start; }
+.names { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.names span { height: 24px; display: flex; align-items: center; justify-content: flex-end; }
+.gbox .matrix { --cell: 52px; gap: 3px; }
+.gbox .matrix__cell { height: 24px; font-size: 12.5px; }
+.gbox .matrix__cell.is-off { color: var(--muted); opacity: .55; }
+.out { margin: 8px 0 0; font-size: 13px; line-height: 1.45; }
+.out p { margin: 0; overflow-wrap: anywhere; }
+#line { color: var(--ink); }
+.viz { margin: 6px 0 0; }
+.viz .muted { margin: 0; font-size: 12.5px; }
+.viz pre { margin: 2px 0 0; font-size: 11px; line-height: 1.2; overflow-x: auto; }
+@media (max-width: 520px) { .gbox .matrix { --cell: 44px; } }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 9 · урок «Causal Mask»</p>
+<h1>Каузальная маска: токен не видит будущее</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel">
+  <div class="row"><span class="row" id="maskmode"></span><span class="muted">позиция:</span><span class="row" id="pos"></span></div>
+  <div class="grids">
+    <div class="grid"><span class="muted">scores (можно менять; столбцы - те же токены)</span><div class="gbox"><div class="names mono"></div><div id="cells"></div></div></div>
+    <div class="grid" id="gmask"><span class="muted">M (маска)</span><div class="gbox"><div class="names mono"></div><div id="mmask"></div></div></div>
+    <div class="grid" id="gscore"><span class="muted">scores + M</span><div class="gbox"><div class="names mono"></div><div id="mscore"></div></div></div>
+    <div class="grid"><span class="muted">веса после softmax (сумма строки = 1)</span><div class="gbox"><div class="names mono"></div><div id="mweights"></div></div></div>
+  </div>
+  <div class="out mono"><p id="sees"></p><p id="line"></p></div>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+<div class="viz"><p class="muted">Так маску печатает CausalMask.visualize из урока 10:</p><pre class="mono" id="viz"></pre></div>
+
+<script type="module">
+import { PRESET, TOKENS, maskText, maskedText, parseCell, scoresText, seesText, softmaxLine, visualizeText, weightText } from "./logic.js";
+import { el, matrixView, presets, ready } from "../../kit/ui.js";
+
+const $ = (id) => document.getElementById(id);
+const PARSE = "Числа - до 2 знаков после точки, по модулю не больше 5. Красные клетки в расчёт не попали.";
+const ON = "Маска прибавляет -∞ к будущим клеткам, softmax даёт им вес 0. Сумма строки по-прежнему 1.";
+const OFF = "Без маски токен смотрит на все токены, даже на слова, которых при генерации ещё нет.";
+const state = { S: PRESET.map((row) => [...row]), on: true, t: 1, bad: new Set() };
+
+document.querySelectorAll(".names").forEach((box) => box.replaceChildren(...TOKENS.map((t) => el("span", {}, t))));
+const cells = matrixView($("cells"), scoresText(state.S), {
+  editable: true,
+  label: "scores",
+  onEdit(i, j, text) {
+    const v = parseCell(text);
+    if (v === null) state.bad.add(`${i},${j}`);
+    else {
+      state.bad.delete(`${i},${j}`);
+      state.S[i][j] = v;
+    }
+    render();
+  },
+});
+const mmask = matrixView($("mmask"), maskText(), { label: "M" });
+const mscore = matrixView($("mscore"), maskedText(state.S), { label: "scores + M" });
+const mweights = matrixView($("mweights"), weightText(state.S, true), { label: "веса" });
+
+function render() {
+  const { S, on, t } = state;
+  const off = (i, j) => on && j > i;
+  cells.mark("is-invalid", (i, j) => state.bad.has(`${i},${j}`));
+  cells.mark("is-row", (i, j) => i === t && !state.bad.has(`${i},${j}`));
+  $("gmask").hidden = !on;
+  $("gscore").hidden = !on;
+  mscore.set(maskedText(S));
+  mweights.set(weightText(S, on));
+  for (const view of [mmask, mscore, mweights]) {
+    view.mark("is-row", (i, j) => i === t && !off(i, j));
+    view.mark("is-off", off);
+  }
+  $("sees").textContent = seesText(S, t, on);
+  $("line").textContent = softmaxLine(S, t, on);
+  $("caption").textContent = state.bad.size ? PARSE : on ? ON : OFF;
+}
+
+presets($("maskmode"), [{ label: "с маской", value: true }, { label: "без маски", value: false }], (on) => {
+  state.on = on;
+  render();
+}).setActive(0);
+presets($("pos"), TOKENS.map((t, i) => ({ label: t, value: i })), (i) => {
+  state.t = i;
+  render();
+}).setActive(1);
+$("viz").textContent = visualizeText();
+render();
+ready();
+</script>
+</body>
+</html>

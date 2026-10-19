@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конвейер внимания с весами</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+h1 { margin-bottom: 8px; }
+.top { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-start; }
+button { padding: 4px 9px; font-size: 13px; }
+.panel { padding: 10px; margin-bottom: 8px; }
+.editor { display: grid; gap: 6px; }
+.xbox { display: flex; gap: 6px; align-items: flex-start; }
+.names { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.names span { height: 30px; display: flex; align-items: center; justify-content: flex-end; }
+#m { --cell: 46px; }
+#m .matrix__cell { height: 30px; font-size: 13px; }
+.controls { flex: 1 1 360px; min-width: 0; display: grid; gap: 6px; }
+.flags { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 13px; }
+.flags label { display: inline-flex; gap: 6px; align-items: center; }
+.flags .muted { font-size: 12px; }
+.flags[hidden], .names[hidden] { display: none; }
+.chip.has-bad { border-color: var(--red); color: var(--red); }
+.work { display: grid; gap: 8px; }
+.tables { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-start; }
+.res { border-collapse: separate; border-spacing: 3px; font-size: 12.5px; }
+.res th { padding: 0 3px; font-weight: 400; color: var(--muted); }
+.res th.corner { text-align: left; color: var(--ink); font-size: 12px; }
+.res td { min-width: 40px; padding: 2px 4px; text-align: right; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.res tr.is-row td { border-color: var(--cyan); background: rgba(34, 211, 238, .14); }
+.res td.is-diag { border-color: var(--orange); color: var(--orange); }
+.lines { min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.3; }
+.lines li { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lines li.is-now { color: var(--yellow); }
+.lines li.is-hidden { visibility: hidden; }
+.note { margin: 4px 0 0; font-size: 12.5px; }
+@media (max-width: 520px) {
+  .res td { min-width: 0; padding: 3px 4px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 9 · уроки 4-9</p>
+<h1>Конвейер внимания с весами</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel top">
+  <div class="editor">
+    <div class="row" id="mats" aria-label="Какую матрицу править"></div>
+    <div class="xbox"><div class="names mono" id="names"></div><div id="m"></div></div>
+  </div>
+  <div class="controls">
+    <div class="row" id="presets"></div>
+    <div class="row" id="stages"></div>
+    <div class="row"><span class="muted">запрос:</span><span class="row" id="query"></span>
+      <button type="button" class="btn-play" id="play">▶ по шагам</button></div>
+    <div class="flags" id="flags">
+      <label><input type="checkbox" id="scale"> ÷√d</label>
+      <label><input type="checkbox" id="mask"> маска</label>
+      <span class="muted">в коде урока 10 scale=True, в ручном примере деления нет</span>
+    </div>
+  </div>
+</div>
+<div class="panel work">
+  <div class="tables mono" id="tables"></div>
+  <ol class="lines mono" id="lines"></ol>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+<p class="muted note" id="note">Вручную каждый шаг округляем до 4 знаков, код считает без округлений - последняя цифра может отличаться.</p>
+
+<script type="module">
+import { MATS, PRESETS, TOKENS, compare, contextLines, contextMatrix, fits, parseW, parseX, qkvLines, qkvMatrix,
+  scoreLines, scoreMatrix, softmaxLines, units, weightMatrix } from "./logic.js";
+import { el, matrixView, presets, ready, stepPlayer } from "../../kit/ui.js";
+
+const STAGES = [
+  { value: "qkv", label: "Q, K, V" },
+  { value: "scores", label: "scores" },
+  { value: "softmax", label: "softmax" },
+  { value: "context", label: "контекст" },
+  { value: "compare", label: "сравнение" },
+];
+const MAT_LABELS = { X: "X", Q: "W_Q", K: "W_K", V: "W_V" };
+const PARSE = "X - до 2 знаков после точки, W - до 1 знака, по модулю не больше 2. Красные клетки в расчёт не попали.";
+const RANGE = "С этим числом экспоненты вручную с 4 знаками уже не посчитать: наибольший score в каждой строке должен быть от -2 до 16. Красные клетки в расчёт не попали.";
+const CAPTIONS = {
+  qkv: (t) => `Токен «${t}»: q, k и v - это его вектор x, умноженный на W_Q, W_K и W_V.`,
+  scores: (t) => `Строка «${t}»: q этого токена умножаем на k каждого токена. Q и K разные, поэтому The · cat не обязано равняться cat · The.`,
+  softmax: (t) => `Строка «${t}»: экспоненты делим на их сумму - веса положительные и в сумме дают 1.`,
+  context: (t) => `Контекстный вектор «${t}» - смесь векторов V с весами из softmax.`,
+};
+const copy = (m) => m.map((row) => [...row]);
+const asked = new URLSearchParams(location.search).get("stage");
+const state = {
+  X: copy(PRESETS[0].x),
+  W: { Q: copy(PRESETS[0].w.Q), K: copy(PRESETS[0].w.K), V: copy(PRESETS[0].w.V) },
+  mat: "X",
+  bad: new Map(),   // "матрица,i,j" → { reason: "parse" | "range", text }
+  stage: STAGES.some((s) => s.value === asked) ? asked : "qkv",
+  q: 0,
+  opts: { scale: false, mask: false },
+  step: -1,
+};
+const $ = (id) => document.getElementById(id);
+
+/** Что видно в редакторе: числа выбранной матрицы, у красных клеток - то, что вписано. */
+function shown() {
+  const m = state.mat === "X" ? state.X : state.W[state.mat];
+  const k = state.mat === "X" ? 2 : 1;
+  return m.map((row, i) => row.map((v, j) => state.bad.get(`${state.mat},${i},${j}`)?.text ?? units(v, k)));
+}
+
+function table(title, cols, cells, { diag = false, names = true } = {}) {
+  return el("table", { class: "res" },
+    el("tr", {}, el("th", { class: "corner" }, title), cols.map((c) => el("th", {}, c))),
+    ...cells.map((row, i) => el("tr", { class: i === state.q ? "is-row" : "" },
+      el("th", {}, names ? TOKENS[i] : ""), row.map((v, j) => el("td", { class: diag && i === j ? "is-diag" : "" }, v)))));
+}
+
+function tables() {
+  const { X, W, opts } = state;
+  const sub = (name) => [`${name}₁`, `${name}₂`, `${name}₃`];
+  if (state.stage === "qkv") {
+    const m = qkvMatrix(X, W);
+    return [table("Q", sub("q"), m.Q), table("K", sub("k"), m.K, { names: false }), table("V", sub("v"), m.V, { names: false })];
+  }
+  if (state.stage === "scores") return [table(opts.scale ? "÷√3" : "scores", TOKENS, scoreMatrix(X, W, opts))];
+  if (state.stage === "softmax") return [table("веса", TOKENS, weightMatrix(X, W, opts).manual)];
+  if (state.stage === "context") return [table("Z", sub("z"), contextMatrix(X, W, opts).manual)];
+  const c = compare(X, W);
+  return [table("без весов", TOKENS, c.plain, { diag: true }), table("с весами", TOKENS, c.trained, { diag: true })];
+}
+
+/** Строки расчёта текущей вкладки для токена-запроса. */
+function lines() {
+  const { X, W, q, opts } = state;
+  if (state.stage === "qkv") return qkvLines(X, W, q);
+  if (state.stage === "scores") return scoreLines(X, W, q, opts);
+  if (state.stage === "softmax") {
+    const s = softmaxLines(X, W, q, opts);
+    return [...s.exps, s.sum, ...s.divs, s.check];
+  }
+  if (state.stage === "context") return contextLines(X, W, q, opts);
+  return compare(X, W).rows;
+}
+
+function caption() {
+  const reasons = [...state.bad.values()].map((b) => b.reason);
+  if (reasons.includes("parse")) return PARSE;
+  if (reasons.includes("range")) return RANGE;
+  if (state.stage === "compare") return compare(state.X, state.W).self;
+  return CAPTIONS[state.stage](TOKENS[state.q]);
+}
+
+function render() {
+  view.mark("is-invalid", (i, j) => state.bad.has(`${state.mat},${i},${j}`));
+  [...$("mats").children].forEach((chip, k) => {   // «!» у матрицы с красными клетками, даже если она не в редакторе
+    const has = [...state.bad.keys()].some((key) => key.startsWith(`${MATS[k]},`));
+    chip.textContent = has ? `${MAT_LABELS[MATS[k]]} !` : MAT_LABELS[MATS[k]];
+    chip.classList.toggle("has-bad", has);
+  });
+  $("names").hidden = state.mat !== "X";
+  $("flags").hidden = state.stage === "qkv" || state.stage === "compare";
+  $("note").hidden = state.stage === "qkv" || state.stage === "compare";   // там нет пометок «код»
+  $("tables").replaceChildren(...tables());
+  $("lines").replaceChildren(...lines().map((text, k) => el("li", {
+    class: state.step === -1 ? "" : k === state.step ? "is-now" : k > state.step ? "is-hidden" : "",
+  }, text)));
+  $("caption").textContent = caption();
+}
+
+/** X и W, если в клетку mat[i][j] поставить value. */
+function withValue(mat, i, j, value) {
+  const X = copy(state.X);
+  const W = { Q: copy(state.W.Q), K: copy(state.W.K), V: copy(state.W.V) };
+  (mat === "X" ? X : W[mat])[i][j] = value;
+  return { X, W };
+}
+
+/** Красные клетки «вне пределов» после каждой удачной правки пробуем снова: причину могли убрать. */
+function retryPending() {
+  for (const [key, b] of [...state.bad]) {
+    if (b.reason !== "range") continue;
+    const [mat, i, j] = key.split(",");
+    const next = withValue(mat, Number(i), Number(j), mat === "X" ? parseX(b.text) : parseW(b.text));
+    if (fits(next.X, next.W)) {
+      state.bad.delete(key);
+      ({ X: state.X, W: state.W } = next);
+    }
+  }
+}
+
+/** Правка клетки: неверный текст или выход scores за пределы - клетка красная, расчёт прежний. */
+function edit(i, j, text) {
+  const key = `${state.mat},${i},${j}`;
+  const value = state.mat === "X" ? parseX(text) : parseW(text);
+  if (value === null) {
+    state.bad.set(key, { reason: "parse", text });
+    return;
+  }
+  const next = withValue(state.mat, i, j, value);
+  if (!fits(next.X, next.W)) {
+    state.bad.set(key, { reason: "range", text });
+    return;
+  }
+  state.bad.delete(key);
+  ({ X: state.X, W: state.W } = next);
+  retryPending();
+}
+
+$("names").replaceChildren(...TOKENS.map((t) => el("span", {}, t)));
+const view = matrixView($("m"), shown(), {
+  editable: true,
+  label: "X",
+  onEdit: (i, j, text) => change(() => edit(i, j, text)),
+});
+
+const player = stepPlayer($("play"), {
+  steps: () => lines(),
+  onStep(i) {
+    state.step = i;
+    render();
+  },
+  interval: 900,
+});
+
+/** Любое изменение данных: сначала остановить проигрывание. */
+function change(update) {
+  player.stop();
+  update();
+  render();
+}
+
+presets($("presets"), PRESETS.map((p) => ({ label: p.label, value: p })), (p) => change(() => {
+  state.X = copy(p.x);
+  state.W = { Q: copy(p.w.Q), K: copy(p.w.K), V: copy(p.w.V) };
+  state.bad.clear();
+  view.set(shown());
+})).setActive(0);
+presets($("mats"), MATS.map((m) => ({ label: MAT_LABELS[m], value: m })), (m) => change(() => {
+  state.mat = m;
+  view.set(shown());
+})).setActive(0);
+presets($("stages"), STAGES, (v) => change(() => { state.stage = v; }))
+  .setActive(STAGES.findIndex((s) => s.value === state.stage));
+presets($("query"), TOKENS.map((t, i) => ({ label: t, value: i })), (i) => change(() => { state.q = i; })).setActive(0);
+for (const flag of ["scale", "mask"]) {
+  $(flag).addEventListener("change", (e) => change(() => { state.opts = { ...state.opts, [flag]: e.target.checked }; }));
+}
+render();
+ready();
+</script>
+</body>
+</html>

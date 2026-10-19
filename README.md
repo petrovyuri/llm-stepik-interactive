@@ -47,6 +47,13 @@
 - [Формы тензоров во внимании](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-shapes/) - урок «Код: контекстный вектор»
 - [Без весов на настоящих векторах](https://petrovyuri.github.io/llm-stepik-interactive/m08/real-vectors/) - урок «Код: контекстный вектор»
 
+Модуль 9 «Внимание с обучаемыми весами»:
+
+- [Конвейер внимания с весами](https://petrovyuri.github.io/llm-stepik-interactive/m09/attention-steps/) - уроки «Вычисляем Query, Key, Value», «Attention Scores», «Softmax», «Контекстные векторы», «Сравнение»
+- [Научите «он» смотреть на «сметану»](https://petrovyuri.github.io/llm-stepik-interactive/m09/train-attention/) - урок «Обучаемые матрицы W_Q, W_K, W_V»
+- [Каузальная маска](https://petrovyuri.github.io/llm-stepik-interactive/m09/causal-mask/) - урок «Causal Mask»
+- [Зачем делить на √d](https://petrovyuri.github.io/llm-stepik-interactive/m09/scaling/) - урок «Код: внимание с обучаемыми весами»
+
 ## Как это устроено
 
 Обычные HTML-страницы без сборки и сторонних библиотек, опубликованные через GitHub Pages. В `kit/` лежат общие стили и компоненты, в `mNN/<демо>/` - страница демо, файл `logic.js` с её вычислениями и, если демо нужны готовые числа (векторы, координаты), файл `data.js`.
