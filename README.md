@@ -54,6 +54,13 @@
 - [Каузальная маска](https://petrovyuri.github.io/llm-stepik-interactive/m09/causal-mask/) - урок «Causal Mask»
 - [Зачем делить на √d](https://petrovyuri.github.io/llm-stepik-interactive/m09/scaling/) - урок «Код: внимание с обучаемыми весами»
 
+Модуль 10 «Multi-Head Attention»:
+
+- [Две головы по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m10/two-heads/) - уроки «Шаг 2» - «Шаг 8» (Q, K, V, scores, softmax, контекст, Head 1, concat, W_O)
+- [Разрезать на головы и склеить](https://petrovyuri.github.io/llm-stepik-interactive/m10/split-heads/) - уроки «Архитектура Multi-Head Attention» и «Код»
+- [Головы настоящей GPT-2](https://petrovyuri.github.io/llm-stepik-interactive/m10/gpt2-heads/) - урок «Зачем нужно Multi-Head Attention?»
+- [Размеры и параметры](https://petrovyuri.github.io/llm-stepik-interactive/m10/head-sizes/) - уроки «Весовые матрицы для каждой головы» и «Сравнение голов нашей модели с GPT-3»
+
 ## Как это устроено
 
 Обычные HTML-страницы без сборки и сторонних библиотек, опубликованные через GitHub Pages. В `kit/` лежат общие стили и компоненты, в `mNN/<демо>/` - страница демо, файл `logic.js` с её вычислениями и, если демо нужны готовые числа (векторы, координаты), файл `data.js`.

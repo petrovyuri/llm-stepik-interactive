@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Головы настоящей GPT-2</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+h1 { margin-bottom: 8px; }
+.panel { padding: 8px 10px; margin-bottom: 6px; }
+.work { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-start; }
+.maps { display: grid; grid-template-columns: repeat(4, auto); gap: 6px; }
+.map { display: grid; gap: 2px; justify-items: center; padding: 3px; border-radius: 8px; font-size: 11px; color: var(--muted); }
+.map[aria-pressed="true"] { border-color: var(--yellow); color: var(--yellow); }
+.mini { display: grid; grid-template-columns: repeat(5, 11px); gap: 1px; }
+.mini span { width: 11px; height: 11px; border-radius: 2px; }
+.big { flex: 1 1 240px; display: grid; gap: 4px; min-width: 0; }
+.big-title { margin: 0; font-size: 13px; color: var(--yellow); }
+.att { border-collapse: separate; border-spacing: 2px; font-size: 12px; }
+.att th { padding: 0 3px; font-weight: 400; color: var(--muted); }
+.att th.col { font-size: 11px; }
+.att td { width: 38px; height: 24px; text-align: center; border: 1px solid var(--line); border-radius: 5px; }
+.att td.future { border-style: dashed; opacity: .5; }
+.top { margin: 0; font-size: 12.5px; }
+.sink { margin: 0; font-size: 13px; }
+.note { margin: 4px 0 0; font-size: 12.5px; }
+@media (max-width: 520px) {
+  .maps { grid-template-columns: repeat(3, auto); }
+  .att td { width: 36px; }
+}
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 10 · урок «Зачем нужно Multi-Head Attention?»</p>
+<h1>12 голов GPT-2 на фразе «The cat loved sour cream»</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel"><div class="slider-holder" id="layer"></div></div>
+<div class="panel work">
+  <div class="maps" id="maps" aria-label="Карты внимания 12 голов"></div>
+  <div class="big">
+    <p class="big-title" id="big-title"></p>
+    <div class="mono" id="big"></div>
+    <p class="top" id="top"></p>
+  </div>
+</div>
+<p class="sink" id="sink"></p>
+<p class="caption" id="caption" aria-live="polite"></p>
+<p class="muted note">Первый токен часто забирает почти всё внимание: так обученная модель «паркует» внимание, когда в строке нет ничего полезного для этой головы.</p>
+
+<script type="module">
+import { ATT, HEADS, LAYERS, TOKENS, captionText, cellText, sinkText, topText } from "./logic.js";
+import { el, ready, slider } from "../../kit/ui.js";
+
+const state = { l: 0, h: 0 };
+const $ = (id) => document.getElementById(id);
+const shade = (w) => `rgba(34, 211, 238, ${w.toFixed(3)})`;
+
+function mini(l, h) {
+  return el("span", { class: "mini" }, ATT[l][h].flatMap((row, i) => row.map((w, j) =>
+    el("span", { style: j > i ? "background: transparent" : `background: ${shade(w)}` }))));
+}
+
+function big() {
+  const { l, h } = state;
+  return el("table", { class: "att" },
+    el("tr", {}, el("th", {}, ""), TOKENS.map((t) => el("th", { class: "col" }, t))),
+    ...TOKENS.map((t, i) => el("tr", {}, el("th", {}, t), TOKENS.map((_, j) => el("td", {
+      class: j > i ? "future" : "",
+      style: j > i ? "" : `background: ${shade(ATT[l][h][i][j])}; color: ${ATT[l][h][i][j] > 0.55 ? "var(--bg)" : "var(--ink)"}`,
+    }, cellText(l, h, i, j))))));
+}
+
+function render() {
+  const { l, h } = state;
+  $("maps").replaceChildren(...Array.from({ length: HEADS }, (_, k) => el("button", {
+    type: "button",
+    class: "map",
+    "aria-pressed": String(k === h),
+    "aria-label": `слой ${l}, голова ${k}`,
+    onclick: () => { state.h = k; render(); },
+  }, mini(l, k), `голова ${k}`)));
+  $("big-title").textContent = `Слой ${l}, голова ${h}`;
+  $("big").replaceChildren(big());
+  $("top").textContent = topText(l, h);
+  $("sink").textContent = sinkText(l);
+  $("caption").textContent = captionText(l);
+}
+
+slider($("layer"), {
+  label: "слой GPT-2",
+  min: 0,
+  max: LAYERS - 1,
+  step: 1,
+  value: 0,
+  format: (v) => `слой ${v}`,
+  onInput: (v) => { state.l = v; render(); },   // выбранная голова остаётся
+});
+render();
+ready();
+</script>
+</body>
+</html>

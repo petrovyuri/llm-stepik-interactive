@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Разрезать на головы и склеить</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+h1 { margin-bottom: 8px; }
+button { padding: 4px 9px; font-size: 13px; }
+.panel { padding: 8px 10px; margin-bottom: 6px; }
+.top { display: grid; gap: 4px; }
+.row[hidden] { display: none; }
+.muted-label { color: var(--muted); font-size: 13px; }
+.code { margin: 0; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  font-size: 12.5px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.shape { font-size: 15px; color: var(--yellow); }
+.tensor { --cw: 46px; --fs: 12.5px; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-start; margin-top: 8px; }
+.tensor.small { --cw: clamp(14px, calc((100vw - 104px) / 16), 30px); --fs: clamp(9.5px, 2.8vw, 12px); }
+.block { display: grid; gap: 3px; }
+.bt { font-size: 12px; }
+.r { display: flex; gap: 6px; align-items: center; }
+.tok { width: 38px; flex: none; font-size: 12px; color: var(--muted); text-align: right; }
+.tensor.small .tok { width: 22px; }
+.grp { display: flex; gap: 2px; }
+.cell { width: var(--cw); height: 24px; display: grid; place-items: center; font-size: var(--fs);
+  border: 1px solid var(--hc); border-radius: 5px; background: var(--bg); color: var(--hc); }
+.h0 { --hc: var(--cyan); }
+.h1 { --hc: var(--purple); }
+.h2 { --hc: var(--green); }
+.h3 { --hc: var(--orange); }
+.gap .grp + .grp { margin-left: 6px; }
+.flat .r { gap: 2px; }
+.flat .grp + .grp { margin-left: 0; }
+@media (max-width: 520px) {
+  .r { gap: 4px; }
+  .tensor.small .tok { width: 18px; }
+  .grp { gap: 1px; }
+  .gap .grp + .grp { margin-left: 3px; }
+  .flat .r { gap: 1px; }
+}
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 10 · уроки «Архитектура» и «Код»</p>
+<h1>Разрезать на головы и склеить</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel top">
+  <div class="row" id="presets"></div>
+  <div class="row" id="head-row"><span class="muted-label">num_heads:</span><span class="row" id="heads"></span></div>
+  <div class="row">
+    <button type="button" id="prev">◀</button>
+    <span id="step" class="mono">Шаг 1 из 5</span>
+    <button type="button" id="next">▶</button>
+    <button type="button" class="btn-play" id="play">▶ по шагам</button>
+  </div>
+</div>
+<div class="panel">
+  <pre class="code" id="code"></pre>
+  <div class="row row--top"><span class="muted-label">форма:</span><span class="shape mono" id="shape"></span></div>
+  <div class="tensor mono" id="tensor"></div>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+
+<script type="module">
+import { PRESETS, STEPS, captionText, cellText, codeText, headOf, layout, shapeText } from "./logic.js";
+import { el, presets, ready, stepPlayer } from "../../kit/ui.js";
+
+const TOKENS = ["The", "cat", "loved"];
+const state = {
+  preset: new URLSearchParams(location.search).get("preset") === "code" ? 1 : 0,
+  H: 2,
+  step: 0,
+};
+const $ = (id) => document.getElementById(id);
+const dims = () => {
+  const p = PRESETS[state.preset];
+  return [p.d, p.L, state.H];
+};
+
+function cell([i, c]) {
+  const [d, , H] = dims();
+  return el("span", { class: `cell h${headOf(c, d, H) % 4}` }, cellText(state.preset, i, c));
+}
+
+const tokenName = (i) => (state.preset === 0 ? TOKENS[i] : `t${i}`);
+
+/** Строка токена: группы клеток по головам. */
+const tokenRow = (i, groups, named = true) => el("div", { class: "r" }, named && el("span", { class: "tok" }, tokenName(i)),
+  groups.map((g) => el("span", { class: "grp" }, g.map(cell))));
+
+function tensor() {
+  const [d, L, H] = dims();
+  const lay = layout(state.step, d, L, H);
+  const hd = d / H;
+  if (state.step === 2) {   // (1, H, L, hd): у каждой головы своя матрица
+    return lay.map((rows, h) => el("div", { class: "block" },
+      el("span", { class: `bt h${h % 4}`, style: "color: var(--hc)" }, `голова ${h}`),
+      rows.map((row, i) => tokenRow(i, [row], h === 0))));   // токены подписаны у первой головы
+  }
+  if (state.step === 1 || state.step === 3) {   // (1, L, H, hd): головы уже разделены, но лежат в строке токена
+    return [el("div", { class: "block gap" }, lay.map((groups, i) => tokenRow(i, groups)))];
+  }
+  // (1, L, d): одна строка из d чисел на токен
+  return [el("div", { class: "block flat" }, lay.map((row, i) => tokenRow(i,
+    Array.from({ length: H }, (_, h) => row.slice(h * hd, (h + 1) * hd)))))];
+}
+
+function render() {
+  const [d, L, H] = dims();
+  $("head-row").hidden = state.preset === 0;
+  $("step").textContent = `Шаг ${state.step + 1} из ${STEPS}`;
+  $("prev").disabled = state.step === 0;
+  $("next").disabled = state.step === STEPS - 1;
+  $("code").textContent = codeText(state.step);
+  $("shape").textContent = shapeText(state.step, d, L, H);
+  $("tensor").className = `tensor mono${state.preset === 1 ? " small" : ""}`;
+  $("tensor").replaceChildren(...tensor());
+  $("caption").textContent = captionText(state.step, d, H);
+}
+
+const player = stepPlayer($("play"), {
+  steps: () => Array.from({ length: STEPS }, (_, k) => k),
+  onStep(i) {
+    if (i === -1) return;   // показ кончился - остаёмся на последнем шаге
+    state.step = i;
+    render();
+  },
+  interval: 1200,
+});
+
+/** Любое изменение: сначала остановить проигрывание. */
+function change(update) {
+  player.stop();
+  update();
+  render();
+}
+
+const headPicker = presets($("heads"), PRESETS[1].heads.map((h) => ({ label: String(h), value: h })),
+  (h) => change(() => { state.H = h; state.step = 0; }));
+headPicker.setActive(PRESETS[1].heads.indexOf(2));
+presets($("presets"), PRESETS.map((p, k) => ({ label: p.label, value: k })), (k) => change(() => {
+  state.preset = k;
+  state.H = 2;
+  state.step = 0;
+  headPicker.setActive(PRESETS[1].heads.indexOf(2));
+})).setActive(state.preset);
+$("prev").addEventListener("click", () => change(() => { state.step = Math.max(0, state.step - 1); }));
+$("next").addEventListener("click", () => change(() => { state.step = Math.min(STEPS - 1, state.step + 1); }));
+render();
+ready();
+</script>
+</body>
+</html>

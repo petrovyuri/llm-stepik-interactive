@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Две головы по шагам</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+h1 { margin-bottom: 6px; }
+button { padding: 4px 9px; font-size: 13px; }
+.panel { padding: 8px 10px; margin-bottom: 6px; }
+.top { display: grid; gap: 4px; }
+.row[hidden], .flag[hidden], ol[hidden], .note[hidden] { display: none; }
+.muted-label { color: var(--muted); font-size: 13px; }
+#heads .chip:nth-child(1)[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+#heads .chip:nth-child(2)[aria-pressed="true"] { border-color: var(--purple); color: var(--purple); }
+.flag { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+.work { display: grid; gap: 8px; }
+.tables { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-start; }
+.res { --hc: var(--cyan); border-collapse: separate; border-spacing: 3px; font-size: 12.5px; }
+.res.h1 { --hc: var(--purple); }
+.res.all { --hc: var(--green); }
+.res th { padding: 0 3px; font-weight: 400; color: var(--muted); }
+.res th.corner { text-align: left; color: var(--hc); font-size: 12px; }
+.res td { min-width: 44px; padding: 2px 4px; text-align: right; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+.res td.c0 { color: var(--cyan); }
+.res td.c1 { color: var(--purple); }
+.res th.c0 { color: var(--cyan); }
+.res th.c1 { color: var(--purple); }
+.res tr.is-row td { border-color: var(--hc); background: rgba(52, 211, 153, .12); }
+.res:not(.all) tr.is-row td { background: rgba(34, 211, 238, .14); }
+.res.h1 tr.is-row td { background: rgba(168, 85, 247, .16); }
+.lines { min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12px; line-height: 1.3; }
+.lines li { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lines li.is-now { color: var(--yellow); }
+.lines li.is-hidden { visibility: hidden; }
+#single-lines { padding-top: 3px; border-top: 1px dashed var(--line); color: var(--muted); }
+.note { margin: 4px 0 0; font-size: 12.5px; }
+@media (max-width: 520px) {
+  .res td { min-width: 0; padding: 3px 4px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 10 · уроки «Шаг 2» - «Шаг 8»</p>
+<h1>Две головы: Q, K, V → scores → softmax → контекст → concat → W_O</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel top">
+  <div class="row" id="stages"></div>
+  <div class="row" id="head-row"><span class="muted-label">голова:</span><span class="row" id="heads"></span></div>
+  <div class="row"><span class="muted-label">запрос:</span><span class="row" id="query"></span>
+    <button type="button" class="btn-play" id="play">▶ по шагам</button>
+    <label class="flag" id="single-flag"><input type="checkbox" id="single"> одна голова (урок 6)</label></div>
+</div>
+<div class="panel work">
+  <div class="tables mono" id="tables"></div>
+  <ol class="lines mono" id="lines"></ol>
+  <ol class="lines mono" id="single-lines"></ol>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+<p class="muted note" id="note">Вручную мы округляем каждое произведение и каждый шаг до 4 знаков, код считает без округлений - последняя цифра может отличаться.</p>
+
+<script type="module">
+import { STAGES, TOKENS, captionText, concatLine, concatMatrix, contextLines, contextMatrix, outMatrix, qkvLines,
+  qkvMatrix, scoreLines, scoreMatrix, singleLines, softmaxLines, weightMatrix, woLines } from "./logic.js";
+import { el, presets, ready, stepPlayer } from "../../kit/ui.js";
+
+const LABELS = { qkv: "Q, K, V", scores: "scores", softmax: "softmax", context: "контекст", concat: "concat", wo: "W_O" };
+const params = new URLSearchParams(location.search);
+const state = {
+  stage: STAGES.includes(params.get("stage")) ? params.get("stage") : "qkv",
+  h: params.get("head") === "1" ? 1 : 0,
+  q: 0,
+  single: false,
+  step: -1,
+};
+const $ = (id) => document.getElementById(id);
+const perHead = () => state.stage !== "concat" && state.stage !== "wo";
+
+/** Таблица: строка запроса подсвечена цветом головы; cls(j) - класс столбца j (concat: половины голов). */
+function table(title, cols, cells, { kind = `h${state.h}`, names = true, cls = () => "" } = {}) {
+  return el("table", { class: `res ${kind}` },
+    el("tr", {}, el("th", { class: "corner" }, title), cols.map((c, j) => el("th", { class: cls(j) }, c))),
+    ...cells.map((row, i) => el("tr", { class: i === state.q ? "is-row" : "" },
+      el("th", {}, names ? TOKENS[i] : ""), row.map((v, j) => el("td", { class: cls(j) }, v)))));
+}
+
+function tables() {
+  const { h } = state;
+  const sub = (name, n) => Array.from({ length: n }, (_, d) => `${name}${"₁₂₃₄"[d]}`);
+  if (state.stage === "qkv") {
+    const m = qkvMatrix(h);
+    return [table(`Q${h}`, sub("q", 2), m.Q), table(`K${h}`, sub("k", 2), m.K, { names: false }),
+      table(`V${h}`, sub("v", 2), m.V, { names: false })];
+  }
+  if (state.stage === "scores") return [table(`scores${h}`, TOKENS, scoreMatrix(h))];
+  if (state.stage === "softmax") return [table(`веса${h}`, TOKENS, weightMatrix(h).manual)];
+  if (state.stage === "context") return [table(`Z${h}`, sub("z", 2), contextMatrix(h).manual)];
+  if (state.stage === "concat") {
+    return [table("concat", ["z₁⁽⁰⁾", "z₂⁽⁰⁾", "z₁⁽¹⁾", "z₂⁽¹⁾"], concatMatrix(), { kind: "all", cls: (j) => (j < 2 ? "c0" : "c1") })];
+  }
+  return [table("выход", sub("out", 4), outMatrix().manual, { kind: "all" })];
+}
+
+/** Строки расчёта текущей вкладки для токена-запроса. */
+function lines() {
+  const { h, q } = state;
+  if (state.stage === "qkv") return qkvLines(h, q);
+  if (state.stage === "scores") return scoreLines(h, q);
+  if (state.stage === "softmax") {
+    const s = softmaxLines(h, q);
+    return [...s.exps, s.sum, ...s.divs, s.check];
+  }
+  if (state.stage === "context") return contextLines(h, q);
+  if (state.stage === "concat") return [concatLine(q)];
+  return woLines(q);
+}
+
+function render() {
+  const onSoftmax = state.stage === "softmax";
+  $("head-row").hidden = !perHead();
+  $("single-flag").hidden = !onSoftmax;
+  $("note").hidden = state.stage === "qkv" || state.stage === "concat";   // там нет пометок «код»
+  $("tables").replaceChildren(...tables());
+  $("lines").replaceChildren(...lines().map((text, k) => el("li", {
+    class: state.step === -1 ? "" : k === state.step ? "is-now" : k > state.step ? "is-hidden" : "",
+  }, text)));
+  const showSingle = onSoftmax && state.single;
+  $("single-lines").hidden = !showSingle;
+  $("single-lines").replaceChildren(...(showSingle ? singleLines(state.q, state.h).map((text) => el("li", {}, text)) : []));
+  $("caption").textContent = captionText(state.stage, state.h, state.q);
+}
+
+const player = stepPlayer($("play"), {
+  steps: () => lines(),
+  onStep(i) {
+    state.step = i;
+    render();
+  },
+  interval: 900,
+});
+
+/** Любое изменение: сначала остановить проигрывание. */
+function change(update) {
+  player.stop();
+  update();
+  render();
+}
+
+presets($("stages"), STAGES.map((s) => ({ label: LABELS[s], value: s })), (v) => change(() => { state.stage = v; }))
+  .setActive(STAGES.indexOf(state.stage));
+presets($("heads"), [0, 1].map((h) => ({ label: `голова ${h}`, value: h })), (h) => change(() => { state.h = h; }))
+  .setActive(state.h);
+presets($("query"), TOKENS.map((t, i) => ({ label: t, value: i })), (i) => change(() => { state.q = i; })).setActive(0);
+$("single").addEventListener("change", (e) => change(() => { state.single = e.target.checked; }));
+render();
+ready();
+</script>
+</body>
+</html>

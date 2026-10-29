@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Размеры и параметры</title>
+<link rel="stylesheet" href="../../kit/kit.css">
+<style>
+h1 { margin-bottom: 8px; }
+button { padding: 4px 9px; font-size: 13px; }
+.panel { padding: 8px 10px; margin-bottom: 6px; }
+.top { display: grid; gap: 6px; }
+.fields { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 13px; }
+.fields label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+.fields input { width: 76px; padding: 4px 6px; font-size: 14px; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; }
+.fields input.is-invalid { border-color: var(--red); color: var(--red); }
+.bar { display: flex; height: 30px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.bar span { flex: 1 1 0; min-width: 0; display: grid; place-items: center; font-size: 12px; color: var(--bg);
+  border-right: 1px solid var(--bg); overflow: hidden; white-space: nowrap; }
+.bar span:last-child { border-right: 0; }
+.bar .hatch { background: repeating-linear-gradient(135deg, var(--cyan) 0 4px, var(--purple) 4px 8px); }
+.bar .whole { background: var(--panel-2); color: var(--muted); }
+.bar-label { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.out { display: grid; gap: 3px; margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.out .bad { color: var(--red); }
+</style>
+</head>
+<body>
+<p class="eyebrow">Модуль 10 · уроки «Весовые матрицы» и «Сравнение с GPT-3»</p>
+<h1>Сколько голов и сколько параметров</h1>
+<noscript><div class="panel">Демо не запустилось. Откройте его в отдельной вкладке.</div></noscript>
+
+<div class="panel top">
+  <div class="row" id="presets"></div>
+  <div class="fields mono">
+    <label>embed_dim <input id="dim" type="text" inputmode="numeric" autocomplete="off"></label>
+    <label>num_heads <input id="heads" type="text" inputmode="numeric" autocomplete="off"></label>
+  </div>
+</div>
+<div class="panel">
+  <div class="bar mono" id="bar" aria-label="embed_dim, разрезанный на головы"></div>
+  <p class="bar-label" id="bar-label"></p>
+</div>
+<div class="panel">
+  <div class="out mono">
+    <span id="hd"></span>
+    <span id="single"></span>
+    <span id="multi"></span>
+    <span id="extra"></span>
+  </div>
+</div>
+<p class="caption" id="caption" aria-live="polite"></p>
+
+<script type="module">
+import { PARSE, PRESETS, captionText, extraText, headDimText, multiText, parseDim, parseHeads, singleText } from "./logic.js";
+import { el, presets, ready } from "../../kit/ui.js";
+
+const COLORS = ["var(--cyan)", "var(--purple)", "var(--green)", "var(--orange)"];
+const $ = (id) => document.getElementById(id);
+const start = new URLSearchParams(location.search).get("preset") === "gpt3" ? 2 : 0;
+const state = { d: PRESETS[start].d, h: PRESETS[start].h, bad: new Set() };
+
+function bar() {
+  const { d, h } = state;
+  if (d % h) return [el("span", { class: "whole" }, `${d} - на ${h} не делится`)];
+  if (h > 32) return [el("span", { class: "hatch" })];
+  const label = h <= 8 ? String(d / h) : "";
+  return Array.from({ length: h }, (_, k) => el("span", { style: `background: ${COLORS[k % 4]}` }, label));
+}
+
+function render() {
+  const { d, h } = state;
+  $("dim").classList.toggle("is-invalid", state.bad.has("dim"));
+  $("heads").classList.toggle("is-invalid", state.bad.has("heads"));
+  $("bar").replaceChildren(...bar());
+  $("bar-label").textContent = d % h ? "" : `embed_dim = ${d}: ${h} × ${d / h}`;
+  $("hd").textContent = headDimText(d, h);
+  $("hd").className = d % h ? "bad" : "";
+  $("single").textContent = singleText(d);
+  $("multi").textContent = multiText(d);
+  $("extra").textContent = extraText(d);
+  $("caption").textContent = state.bad.size ? PARSE : captionText(d, h);
+}
+
+/** Ввод в поле: неверный текст - поле красное, расчёт прежний. */
+function edit(field, parse, key) {
+  const v = parse($(field).value);
+  if (v === null) state.bad.add(field);
+  else {
+    state.bad.delete(field);
+    state[key] = v;
+  }
+  render();
+}
+
+function fill(p) {
+  state.d = p.d;
+  state.h = p.h;
+  state.bad.clear();
+  $("dim").value = String(p.d);
+  $("heads").value = String(p.h);
+}
+
+presets($("presets"), PRESETS.map((p) => ({ label: p.label, value: p })), (p) => {
+  fill(p);
+  render();
+}).setActive(start);
+$("dim").addEventListener("input", () => edit("dim", parseDim, "d"));
+$("heads").addEventListener("input", () => edit("heads", parseHeads, "h"));
+fill(PRESETS[start]);
+render();
+ready();
+</script>
+</body>
+</html>
