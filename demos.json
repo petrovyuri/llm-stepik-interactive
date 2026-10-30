@@ -1,0 +1,205 @@
+[
+ {
+  "slug": "m02/dot-product",
+  "module": 2,
+  "lesson": 1,
+  "title": "Скалярное произведение = похожесть",
+  "about": "Двигайте два вектора и смотрите, как скалярное произведение показывает их похожесть."
+ },
+ {
+  "slug": "m02/matmul",
+  "module": 2,
+  "lesson": 1,
+  "title": "Умножение матриц по шагам",
+  "about": "Умножение матриц клетка за клеткой: каждая клетка - строка на столбец."
+ },
+ {
+  "slug": "m02/tensor-shape",
+  "module": 2,
+  "lesson": 1,
+  "title": "Форма тензора и reshape",
+  "about": "Скаляр, вектор, матрица и трёхмерный тензор: форма и reshape."
+ },
+ {
+  "slug": "m02/softmax-temperature",
+  "module": 2,
+  "lesson": 2,
+  "title": "Softmax и температура",
+  "about": "Как softmax превращает логиты в вероятности и что с ними делает температура."
+ },
+ {
+  "slug": "m02/gradient-descent",
+  "module": 2,
+  "lesson": 3,
+  "title": "Градиентный спуск",
+  "about": "Шаги вниз по параболе потерь и то, как на них влияет скорость обучения."
+ },
+ {
+  "slug": "m03/arithmetic",
+  "module": 3,
+  "lesson": 1,
+  "title": "Коробки и операции",
+  "about": "Переменные-коробки и операции Python, включая ошибки вроде деления на ноль."
+ },
+ {
+  "slug": "m03/text-to-tokens",
+  "module": 3,
+  "lesson": 3,
+  "title": "От строки к токенам",
+  "about": "strip, lower, replace и split превращают строку в список слов."
+ },
+ {
+  "slug": "m03/loop-trace",
+  "module": 3,
+  "lesson": 2,
+  "title": "Цикл по шагам",
+  "about": "Программы урока с if, while, for, break и continue по одной строке."
+ },
+ {
+  "slug": "m03/autograd",
+  "module": 3,
+  "lesson": 8,
+  "title": "Autograd: y = w · x",
+  "about": "PyTorch сам считает производную: y = w · x и y.backward()."
+ },
+ {
+  "slug": "m05/word-vocab",
+  "module": 5,
+  "lesson": 6,
+  "title": "Словарь, [UNK] и обратный путь",
+  "about": "Словарь слов: текст превращается в ID и обратно, а незнакомые слова становятся [UNK]."
+ },
+ {
+  "slug": "m05/bpe-merges",
+  "module": 5,
+  "lesson": 5,
+  "title": "BPE по шагам",
+  "about": "BPE на вашем корпусе: самые частые пары символов сливаются шаг за шагом."
+ },
+ {
+  "slug": "m06/sliding-window",
+  "module": 6,
+  "lesson": 3,
+  "title": "Скользящее окно",
+  "about": "Окно max_length со сдвигом stride нарезает текст на примеры X и Y."
+ },
+ {
+  "slug": "m06/dataloader",
+  "module": 6,
+  "lesson": 4,
+  "title": "DataLoader: пакеты",
+  "about": "DataLoader собирает примеры в пакеты: batch_size и drop_last."
+ },
+ {
+  "slug": "m07/embedding-table",
+  "module": 7,
+  "lesson": 1,
+  "title": "От ID к вектору",
+  "about": "ID токена выбирает строку в таблице эмбеддингов."
+ },
+ {
+  "slug": "m07/word-map",
+  "module": 7,
+  "lesson": 1,
+  "title": "Карта слов GPT-2",
+  "about": "25 слов GPT-2 на плоскости: похожие по смыслу ложатся рядом."
+ },
+ {
+  "slug": "m07/positions",
+  "module": 7,
+  "lesson": 2,
+  "title": "Переставьте слова",
+  "about": "Переставьте слова и посмотрите, что без позиций модель порядка не видит."
+ },
+ {
+  "slug": "m07/shapes",
+  "module": 7,
+  "lesson": 3,
+  "title": "Формы и параметры",
+  "about": "Формы тензоров от ID до эмбеддингов и число параметров слоя."
+ },
+ {
+  "slug": "m08/attention-steps",
+  "module": 8,
+  "lesson": 5,
+  "title": "Конвейер внимания",
+  "about": "Scores, softmax и контекст для «The cat loved» по шагам, можно со своими числами."
+ },
+ {
+  "slug": "m08/attention-plane",
+  "module": 8,
+  "lesson": 5,
+  "title": "Внимание на плоскости",
+  "about": "Токены точками на плоскости: внимание через скалярное произведение."
+ },
+ {
+  "slug": "m08/attention-shapes",
+  "module": 8,
+  "lesson": 6,
+  "title": "Формы тензоров во внимании",
+  "about": "Формы тензоров внимания [B, L, D] на каждом шаге."
+ },
+ {
+  "slug": "m08/real-vectors",
+  "module": 8,
+  "lesson": 6,
+  "title": "Без весов на настоящих векторах",
+  "about": "Внимание без весов на настоящих векторах GPT-2."
+ },
+ {
+  "slug": "m09/attention-steps",
+  "module": 9,
+  "lesson": 4,
+  "title": "Конвейер внимания с весами",
+  "about": "Q, K, V через обучаемые матрицы: весь конвейер внимания, можно со своими числами."
+ },
+ {
+  "slug": "m09/train-attention",
+  "module": 9,
+  "lesson": 2,
+  "title": "Научите «он» смотреть на «сметану»",
+  "about": "Подберите веса так, чтобы «он» смотрел на «сметану»."
+ },
+ {
+  "slug": "m09/causal-mask",
+  "module": 9,
+  "lesson": 6,
+  "title": "Каузальная маска",
+  "about": "Каузальная маска закрывает токену будущие слова."
+ },
+ {
+  "slug": "m09/scaling",
+  "module": 9,
+  "lesson": 10,
+  "title": "Зачем делить на √d",
+  "about": "Почему scores делят на √d: без этого softmax становится слишком резким."
+ },
+ {
+  "slug": "m10/two-heads",
+  "module": 10,
+  "lesson": 4,
+  "title": "Две головы по шагам",
+  "about": "Две головы внимания по шагам: Q, K, V, softmax, контекст, concat и W_O."
+ },
+ {
+  "slug": "m10/split-heads",
+  "module": 10,
+  "lesson": 2,
+  "title": "Разрезать на головы и склеить",
+  "about": "view и transpose: один тензор разрезается на головы и склеивается обратно."
+ },
+ {
+  "slug": "m10/gpt2-heads",
+  "module": 10,
+  "lesson": 1,
+  "title": "Головы настоящей GPT-2",
+  "about": "Карты внимания 12 голов настоящей GPT-2 на фразе «The cat loved sour cream»."
+ },
+ {
+  "slug": "m10/head-sizes",
+  "module": 10,
+  "lesson": 3,
+  "title": "Размеры и параметры",
+  "about": "head_dim и число параметров при разных embed_dim и num_heads."
+ }
+]

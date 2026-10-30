@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Интерактивные демо курса «LLM своими руками»</title>
+<meta name="description" content="Живые схемы к курсу «LLM своими руками» на Stepik: от векторов и токенизации до механизма внимания.">
+<link rel="stylesheet" href="kit/kit.css">
+<style>
+body { max-width: 1040px; margin: 0 auto; padding: 24px 16px 32px; }
+h1 { font-size: 26px; margin: 4px 0 10px; }
+.intro { margin: 0; max-width: 720px; color: var(--muted); line-height: 1.55; }
+.intro a, .foot a { color: var(--cyan); }
+.count { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px; align-items: start; margin: 20px 0 0; padding: 0; list-style: none; }
+.card { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.card__num { margin: 0; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--cyan); }
+.card h2 { margin: 0; font-size: 17px; line-height: 1.3; }
+.card__about { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+.demos { display: grid; gap: 6px; margin: 6px 0 0; padding: 10px 0 0; list-style: none; border-top: 1px solid var(--line); }
+.demo { display: grid; gap: 2px; padding: 8px 10px; color: var(--ink); text-decoration: none;
+  background: var(--panel-2); border: 1px solid transparent; border-radius: 8px; }
+.demo:hover, .demo:focus-visible { border-color: var(--cyan); outline: none; }
+.demo__title { font-weight: 600; color: var(--cyan); }
+.demo__about { font-size: 13px; line-height: 1.45; color: var(--ink); opacity: .85; }
+.demo__lesson { font-size: 12px; color: var(--muted); }
+.foot { margin: 22px 0 0; font-size: 13px; color: var(--muted); }
+@media (max-width: 400px) { .cards { grid-template-columns: 1fr; } h1 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<p class="eyebrow">Курс Stepik «LLM своими руками»</p>
+<h1>Интерактивные демо</h1>
+<p class="intro">Живые схемы к урокам курса <a href="https://stepik.org/a/276236">«LLM своими руками»</a>. В уроках они стоят сразу после теории, а здесь собраны все вместе: можно вернуться к любой теме и повторить. Числа меняются, ползунки двигаются, а «▶ по шагам» проигрывает расчёт в том же порядке, что и урок.</p>
+<p class="count" id="count"></p>
+<noscript><p class="intro">Каталог собирается скриптом. Включите JavaScript или откройте список демо в <a href="https://github.com/petrovyuri/llm-stepik-interactive">README репозитория</a>.</p></noscript>
+<ul class="cards" id="cards"></ul>
+<p class="foot">Демо следующих модулей появятся здесь, когда выйдут уроки. Код страниц открыт: <a href="https://github.com/petrovyuri/llm-stepik-interactive">llm-stepik-interactive</a>.</p>
+<script type="module">
+import { el } from "./kit/ui.js";
+import { buildCatalog, countText } from "./kit/hub.js";
+
+const [demos, modules] = await Promise.all(["./demos.json", "./modules.json"].map(async (url) => (await fetch(url)).json()));
+const catalog = buildCatalog(demos, modules);
+document.getElementById("count").textContent = countText(demos.length, catalog.length);
+document.getElementById("cards").append(...catalog.map((card) => el("li", { class: "card" },
+  el("p", { class: "card__num" }, `Модуль ${card.module}`),
+  el("h2", {}, card.title),
+  el("p", { class: "card__about" }, card.about),
+  el("ul", { class: "demos" }, card.demos.map((demo) => el("li", {},
+    el("a", { class: "demo", href: demo.href },
+      el("span", { class: "demo__title" }, demo.title),
+      el("span", { class: "demo__about" }, demo.about),
+      el("span", { class: "demo__lesson" }, `урок ${demo.lesson}`))))))));
+</script>
+</body>
+</html>

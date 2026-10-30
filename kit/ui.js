@@ -26,8 +26,14 @@ export function svg(tag, attrs = {}) {
   return node;
 }
 
-/** Скрипт демо отработал до конца - это проверяет tests/layout.html. */
+/**
+ * Скрипт демо отработал до конца - это проверяет tests/layout.html.
+ * Если демо открыто отдельной вкладкой, а не в iframe шага, сверху появляется ссылка на главную.
+ */
 export function ready() {
+  if (window.self === window.top && !document.querySelector(".home-link")) {
+    document.body.prepend(el("a", { class: "home-link", href: "../../" }, "← все демо курса"));
+  }
   document.documentElement.dataset.ready = "1";
 }
 

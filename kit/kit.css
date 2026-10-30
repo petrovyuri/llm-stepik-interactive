@@ -73,6 +73,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2
 .good { color: var(--green); }
 .bad { color: var(--red); }
 .muted { color: var(--muted); }
+.home-link { display: inline-block; margin-bottom: 8px; font-size: 13px; color: var(--cyan); text-decoration: none; }
+.home-link:hover, .home-link:focus-visible { text-decoration: underline; }
 
 noscript .panel { color: var(--red); }
 
