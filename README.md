@@ -4,7 +4,7 @@
 
 Каждое демо разбирает один механизм из урока. Числа можно менять, векторы и ползунки двигать, а кнопка «▶ по шагам» проигрывает вычисление в том же порядке, что и урок. Первый экран всегда повторяет пример из урока, поэтому любое число легко сверить с текстом.
 
-Демо встроены в шаги курса, но открываются и сами по себе: все сразу - на [главной странице с карточками модулей](https://petrovyuri.github.io/llm-stepik-interactive/), по одному - по ссылкам ниже.
+Демо встроены в шаги курса. Демо первых пяти модулей открываются и сами по себе: все сразу - на [главной странице с карточками модулей](https://petrovyuri.github.io/llm-stepik-interactive/), по одному - по ссылкам ниже.
 
 ## Демо
 
@@ -40,26 +40,7 @@
 - [Переставьте слова](https://petrovyuri.github.io/llm-stepik-interactive/m07/positions/) - урок «Positional Encoding»
 - [Формы и параметры](https://petrovyuri.github.io/llm-stepik-interactive/m07/shapes/) - урок «Код. Слои эмбеддингов»
 
-Модуль 8 «Внимание без обучаемых весов»:
-
-- [Конвейер внимания](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-steps/) - уроки «Attention Scores», «Softmax», «Контекстные векторы»
-- [Внимание на плоскости](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-plane/) - урок «Контекстные векторы»
-- [Формы тензоров во внимании](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-shapes/) - урок «Код: контекстный вектор»
-- [Без весов на настоящих векторах](https://petrovyuri.github.io/llm-stepik-interactive/m08/real-vectors/) - урок «Код: контекстный вектор»
-
-Модуль 9 «Внимание с обучаемыми весами»:
-
-- [Конвейер внимания с весами](https://petrovyuri.github.io/llm-stepik-interactive/m09/attention-steps/) - уроки «Вычисляем Query, Key, Value», «Attention Scores», «Softmax», «Контекстные векторы», «Сравнение»
-- [Научите «он» смотреть на «сметану»](https://petrovyuri.github.io/llm-stepik-interactive/m09/train-attention/) - урок «Обучаемые матрицы W_Q, W_K, W_V»
-- [Каузальная маска](https://petrovyuri.github.io/llm-stepik-interactive/m09/causal-mask/) - урок «Causal Mask»
-- [Зачем делить на √d](https://petrovyuri.github.io/llm-stepik-interactive/m09/scaling/) - урок «Код: внимание с обучаемыми весами»
-
-Модуль 10 «Multi-Head Attention»:
-
-- [Две головы по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m10/two-heads/) - уроки «Шаг 2» - «Шаг 8» (Q, K, V, scores, softmax, контекст, Head 1, concat, W_O)
-- [Разрезать на головы и склеить](https://petrovyuri.github.io/llm-stepik-interactive/m10/split-heads/) - уроки «Архитектура Multi-Head Attention» и «Код»
-- [Головы настоящей GPT-2](https://petrovyuri.github.io/llm-stepik-interactive/m10/gpt2-heads/) - урок «Зачем нужно Multi-Head Attention?»
-- [Размеры и параметры](https://petrovyuri.github.io/llm-stepik-interactive/m10/head-sizes/) - уроки «Весовые матрицы для каждой головы» и «Сравнение голов нашей модели с GPT-3»
+Модули 8-10 (механизм внимания и Multi-Head Attention): ещё 12 демо открываются в уроках [курса на Stepik](https://stepik.org/a/276236).
 
 ## Как это устроено
 

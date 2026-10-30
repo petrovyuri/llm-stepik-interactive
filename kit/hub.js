@@ -1,5 +1,6 @@
 // Главная страница сайта: карточки модулей со списком демо.
 // Чистые функции без DOM - их проверяет tests/hub.test.js.
+import { isFree } from "./access.js";
 
 /**
  * Карточки: модули с демо по номеру, демо внутри - по уроку (при равенстве - в порядке реестра).
@@ -14,8 +15,16 @@ export function buildCatalog(demos, modules) {
       .map((demo, order) => ({ demo, order }))
       .sort((a, b) => a.demo.lesson - b.demo.lesson || a.order - b.order)
       .map(({ demo }) => ({ slug: demo.slug, title: demo.title, about: demo.about, lesson: demo.lesson, href: `${demo.slug}/` }));
-    return { module, title: entry.title, about: entry.about, demos: list };
+    return { module, title: entry.title, about: entry.about, free: isFree(module), demos: list };
   });
+}
+
+/** Плашка перед закрытыми карточками: «Ещё 12 демо в 3 модулях открываются в уроках курса на Stepik.» */
+export function lockedText(catalog) {
+  const locked = catalog.filter((card) => !card.free);
+  if (locked.length === 0) return "";
+  const demos = locked.reduce((sum, card) => sum + card.demos.length, 0);
+  return `Ещё ${countText(demos, locked.length)} ${demos === 1 ? "открывается" : "открываются"} в уроках курса на Stepik.`;
 }
 
 /** «29 демо в 8 модулях», «1 демо в 1 модуле». */
