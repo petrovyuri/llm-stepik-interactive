@@ -49,10 +49,10 @@ export function showLocked(module) {
   const title = document.querySelector("h1")?.textContent ?? document.title;
   document.body.replaceChildren(
     el("a", { class: "home-link", href: "../../" }, "← все демо курса"),
-    el("p", { class: "eyebrow" }, `Модуль ${module} · курс «LLM своими руками»`),
+    el("p", { class: "eyebrow" }, `Модуль ${module} · курс «Математика LLM - Создаём ChatGPT своими руками с нуля»`),
     el("h1", {}, title),
     el("div", { class: "panel locked" },
-      el("p", {}, "Это демо из курса «LLM своими руками» на Stepik. Оно открывается в уроке, сразу после теории, на тех же числах, что и урок."),
+      el("p", {}, "Это демо из курса «Математика LLM - Создаём ChatGPT своими руками с нуля» на Stepik. Оно открывается в уроке, сразу после теории, на тех же числах, что и урок."),
       el("p", {}, "Если курс уже у вас, откройте этот урок на Stepik. Демо первых пяти модулей открыты всем на главной странице."),
       el("a", { class: "cta", href: COURSE_URL, target: "_top", rel: "noopener" }, "Купить курс на Stepik")));
 }
