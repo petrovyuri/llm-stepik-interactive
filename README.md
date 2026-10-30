@@ -4,62 +4,43 @@
 
 Каждое демо разбирает один механизм из урока. Числа можно менять, векторы и ползунки двигать, а кнопка «▶ по шагам» проигрывает вычисление в том же порядке, что и урок. Первый экран всегда повторяет пример из урока, поэтому любое число легко сверить с текстом.
 
-Демо встроены в шаги курса, но открываются и сами по себе, по ссылкам ниже.
+Демо встроены в шаги курса. Демо первых пяти модулей открываются и сами по себе: все сразу - на [главной странице с карточками модулей](https://petrovyuri.github.io/llm_course_interactive/), по одному - по ссылкам ниже.
 
 ## Демо
 
 Модуль 2 «Мини-математика»:
 
-- [Скалярное произведение = похожесть](https://petrovyuri.github.io/llm-stepik-interactive/m02/dot-product/) - урок «Скаляр → Вектор → Матрица → Тензор»
-- [Умножение матриц по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m02/matmul/) - тот же урок
-- [Форма тензора и reshape](https://petrovyuri.github.io/llm-stepik-interactive/m02/tensor-shape/) - тот же урок
-- [Softmax и температура](https://petrovyuri.github.io/llm-stepik-interactive/m02/softmax-temperature/) - урок «softmax и temperature»
-- [Градиентный спуск](https://petrovyuri.github.io/llm-stepik-interactive/m02/gradient-descent/) - урок «Производная (очень упрощённо)»
+- [Скалярное произведение = похожесть](https://petrovyuri.github.io/llm_course_interactive/m02/dot-product/) - урок «Скаляр → Вектор → Матрица → Тензор»
+- [Умножение матриц по шагам](https://petrovyuri.github.io/llm_course_interactive/m02/matmul/) - тот же урок
+- [Форма тензора и reshape](https://petrovyuri.github.io/llm_course_interactive/m02/tensor-shape/) - тот же урок
+- [Softmax и температура](https://petrovyuri.github.io/llm_course_interactive/m02/softmax-temperature/) - урок «softmax и temperature»
+- [Градиентный спуск](https://petrovyuri.github.io/llm_course_interactive/m02/gradient-descent/) - урок «Производная (очень упрощённо)»
 
 Модуль 3 «Мини-курс Python»:
 
-- [Коробки и операции](https://petrovyuri.github.io/llm-stepik-interactive/m03/arithmetic/) - урок «Переменные, типы, операции»
-- [Цикл по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m03/loop-trace/) - урок «Условия и циклы»
-- [От строки к токенам](https://petrovyuri.github.io/llm-stepik-interactive/m03/text-to-tokens/) - урок «Функции»
-- [Autograd: y = w · x](https://petrovyuri.github.io/llm-stepik-interactive/m03/autograd/) - урок «PyTorch самое нужное»
+- [Коробки и операции](https://petrovyuri.github.io/llm_course_interactive/m03/arithmetic/) - урок «Переменные, типы, операции»
+- [Цикл по шагам](https://petrovyuri.github.io/llm_course_interactive/m03/loop-trace/) - урок «Условия и циклы»
+- [От строки к токенам](https://petrovyuri.github.io/llm_course_interactive/m03/text-to-tokens/) - урок «Функции»
+- [Autograd: y = w · x](https://petrovyuri.github.io/llm_course_interactive/m03/autograd/) - урок «PyTorch самое нужное»
 
 Модуль 5 «Токенизация»:
 
-- [BPE по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m05/bpe-merges/) - урок «BPE»
-- [Словарь, [UNK] и обратный путь](https://petrovyuri.github.io/llm-stepik-interactive/m05/word-vocab/) - урок «Пишем простой токенизатор»
+- [BPE по шагам](https://petrovyuri.github.io/llm_course_interactive/m05/bpe-merges/) - урок «BPE»
+- [Словарь, [UNK] и обратный путь](https://petrovyuri.github.io/llm_course_interactive/m05/word-vocab/) - урок «Пишем простой токенизатор»
 
 Модуль 6 «Подготовка текста»:
 
-- [Скользящее окно](https://petrovyuri.github.io/llm-stepik-interactive/m06/sliding-window/) - урок «Класс Dataset»
-- [DataLoader: пакеты](https://petrovyuri.github.io/llm-stepik-interactive/m06/dataloader/) - урок «DataLoader»
+- [Скользящее окно](https://petrovyuri.github.io/llm_course_interactive/m06/sliding-window/) - урок «Класс Dataset»
+- [DataLoader: пакеты](https://petrovyuri.github.io/llm_course_interactive/m06/dataloader/) - урок «DataLoader»
 
 Модуль 7 «Векторизация»:
 
-- [От ID к вектору](https://petrovyuri.github.io/llm-stepik-interactive/m07/embedding-table/) - урок «Векторные представления»
-- [Карта слов GPT-2](https://petrovyuri.github.io/llm-stepik-interactive/m07/word-map/) - урок «Векторные представления»
-- [Переставьте слова](https://petrovyuri.github.io/llm-stepik-interactive/m07/positions/) - урок «Positional Encoding»
-- [Формы и параметры](https://petrovyuri.github.io/llm-stepik-interactive/m07/shapes/) - урок «Код. Слои эмбеддингов»
+- [От ID к вектору](https://petrovyuri.github.io/llm_course_interactive/m07/embedding-table/) - урок «Векторные представления»
+- [Карта слов GPT-2](https://petrovyuri.github.io/llm_course_interactive/m07/word-map/) - урок «Векторные представления»
+- [Переставьте слова](https://petrovyuri.github.io/llm_course_interactive/m07/positions/) - урок «Positional Encoding»
+- [Формы и параметры](https://petrovyuri.github.io/llm_course_interactive/m07/shapes/) - урок «Код. Слои эмбеддингов»
 
-Модуль 8 «Внимание без обучаемых весов»:
-
-- [Конвейер внимания](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-steps/) - уроки «Attention Scores», «Softmax», «Контекстные векторы»
-- [Внимание на плоскости](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-plane/) - урок «Контекстные векторы»
-- [Формы тензоров во внимании](https://petrovyuri.github.io/llm-stepik-interactive/m08/attention-shapes/) - урок «Код: контекстный вектор»
-- [Без весов на настоящих векторах](https://petrovyuri.github.io/llm-stepik-interactive/m08/real-vectors/) - урок «Код: контекстный вектор»
-
-Модуль 9 «Внимание с обучаемыми весами»:
-
-- [Конвейер внимания с весами](https://petrovyuri.github.io/llm-stepik-interactive/m09/attention-steps/) - уроки «Вычисляем Query, Key, Value», «Attention Scores», «Softmax», «Контекстные векторы», «Сравнение»
-- [Научите «он» смотреть на «сметану»](https://petrovyuri.github.io/llm-stepik-interactive/m09/train-attention/) - урок «Обучаемые матрицы W_Q, W_K, W_V»
-- [Каузальная маска](https://petrovyuri.github.io/llm-stepik-interactive/m09/causal-mask/) - урок «Causal Mask»
-- [Зачем делить на √d](https://petrovyuri.github.io/llm-stepik-interactive/m09/scaling/) - урок «Код: внимание с обучаемыми весами»
-
-Модуль 10 «Multi-Head Attention»:
-
-- [Две головы по шагам](https://petrovyuri.github.io/llm-stepik-interactive/m10/two-heads/) - уроки «Шаг 2» - «Шаг 8» (Q, K, V, scores, softmax, контекст, Head 1, concat, W_O)
-- [Разрезать на головы и склеить](https://petrovyuri.github.io/llm-stepik-interactive/m10/split-heads/) - уроки «Архитектура Multi-Head Attention» и «Код»
-- [Головы настоящей GPT-2](https://petrovyuri.github.io/llm-stepik-interactive/m10/gpt2-heads/) - урок «Зачем нужно Multi-Head Attention?»
-- [Размеры и параметры](https://petrovyuri.github.io/llm-stepik-interactive/m10/head-sizes/) - уроки «Весовые матрицы для каждой головы» и «Сравнение голов нашей модели с GPT-3»
+Модули 8-10 (механизм внимания и Multi-Head Attention): ещё 12 демо открываются в уроках [курса на Stepik](https://stepik.org/a/276236).
 
 ## Как это устроено
 

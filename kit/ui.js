@@ -1,6 +1,7 @@
 // Общие компоненты демо: элементы, SVG, кнопка «по шагам», пресеты,
 // ползунки и сетка чисел. Без зависимостей. Компонент попадает сюда,
 // только когда он нужен хотя бы двум демо.
+import { COURSE_URL, canShow, moduleOf, parentOrigin } from "./access.js";
 
 export const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -26,9 +27,34 @@ export function svg(tag, attrs = {}) {
   return node;
 }
 
-/** Скрипт демо отработал до конца - это проверяет tests/layout.html. */
+/**
+ * Скрипт демо отработал до конца - это проверяет tests/layout.html.
+ * Закрытый модуль вне Stepik (правило - kit/access.js) заменяется заглушкой со ссылкой на курс.
+ * Если демо открыто отдельной вкладкой, а не в iframe шага, сверху появляется ссылка на главную.
+ */
 export function ready() {
+  const framed = window.self !== window.top;
+  const module = moduleOf(location.pathname);
+  const referrer = document.referrer;
+  const parent = framed ? parentOrigin(location.ancestorOrigins, referrer) : null;
+  if (!canShow({ module, host: location.hostname, framed, parent, referrer })) showLocked(module);
+  else if (!framed && !document.querySelector(".home-link")) {
+    document.body.prepend(el("a", { class: "home-link", href: "../../" }, "← все демо курса"));
+  }
   document.documentElement.dataset.ready = "1";
+}
+
+/** Заглушка вместо демо закрытого модуля: название демо, где его открыть и кнопка курса. */
+export function showLocked(module) {
+  const title = document.querySelector("h1")?.textContent ?? document.title;
+  document.body.replaceChildren(
+    el("a", { class: "home-link", href: "../../" }, "← все демо курса"),
+    el("p", { class: "eyebrow" }, `Модуль ${module} · курс «LLM своими руками»`),
+    el("h1", {}, title),
+    el("div", { class: "panel locked" },
+      el("p", {}, "Это демо из курса «LLM своими руками» на Stepik. Оно открывается в уроке, сразу после теории, на тех же числах, что и урок."),
+      el("p", {}, "Если курс уже у вас, откройте этот урок на Stepik. Демо первых пяти модулей открыты всем на главной странице."),
+      el("a", { class: "cta", href: COURSE_URL, target: "_top", rel: "noopener" }, "Купить курс на Stepik")));
 }
 
 /**
